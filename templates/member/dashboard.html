@@ -1,0 +1,53 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="animate-fade-in-up">
+  <div class="mb-4">
+    <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">My Dashboard</h2>
+    <p class="text-muted mb-0">Welcome back! Here's your upcoming schedule</p>
+  </div>
+
+  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.2s;">
+    <h5 class="mb-3 fw-bold" style="color: #2d3748;">📅 Upcoming Shifts</h5>
+
+    {% if upcoming %}
+    <div class="list-group">
+      {% for s in upcoming %}
+      <div class="list-group-item animate-slide-in-right" style="animation-delay: {{ loop.index0 * 0.1 }}s;">
+        <div class="d-flex justify-content-between align-items-start">
+          <div>
+            <div class="d-flex align-items-center gap-2 mb-2">
+              <strong style="font-size: 1.1rem; color: #2d3748;">{{ s.date }}</strong>
+              <span class="badge shift-badge-{{ s.shift_code }}">{{ s.shift_code }}</span>
+              <span class="text-muted">({{ s.start_time }}–{{ s.end_time }})</span>
+            </div>
+            <small class="text-muted d-block">
+              <strong>Project:</strong> 
+              {% if s.project_id %}
+                {{ projects_map[s.project_id|string] }}
+              {% else %}
+                General
+              {% endif %}
+              • <strong>Task:</strong> {{ s.task }}
+            </small>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="text-center py-4">
+      <p class="text-muted mb-3">✨ No upcoming shifts scheduled</p>
+      <a class="btn btn-primary" href="{{ url_for('member.my_schedule') }}">View My Schedule</a>
+    </div>
+    {% endif %}
+  </div>
+
+  {% if upcoming %}
+  <div class="text-center animate-fade-in-up" style="animation-delay: 0.4s;">
+    <a class="btn btn-primary btn-lg" href="{{ url_for('member.my_schedule') }}">
+      📊 View Full Schedule
+    </a>
+  </div>
+  {% endif %}
+</div>
+{% endblock %}

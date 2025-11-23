@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Shift Change Requests</h3>
+
+{% if requests %}
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>User</th>
+        <th>Date</th>
+        <th>Requested Shift</th>
+        <th>Reason</th>
+        <th>Status</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td>{{ users_map[r.user_id|string] }}</td>
+        <td>{{ r.date }}</td>
+        <td>{{ r.requested_shift }}</td>
+        <td>{{ r.reason }}</td>
+        <td class="text-capitalize">{{ r.status }}</td>
+        <td>
+          {% if r.status == 'pending' %}
+          <form method="post" class="d-inline">
+            <input type="hidden" name="req_id" value="{{ r._id }}">
+            <input type="hidden" name="action" value="approve">
+            <button class="btn btn-sm btn-success">Approve</button>
+          </form>
+          <form method="post" class="d-inline">
+            <input type="hidden" name="req_id" value="{{ r._id }}">
+            <input type="hidden" name="action" value="reject">
+            <button class="btn btn-sm btn-danger">Reject</button>
+          </form>
+          {% else %}
+          <span class="text-muted">No actions</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">No shift change requests yet.</p>
+{% endif %}
+{% endblock %}

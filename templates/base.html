@@ -1,0 +1,103 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <title>Shift & Project Scheduler</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+
+  <!-- Google Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <!-- Bootstrap -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
+    rel="stylesheet">
+
+  <!-- FullCalendar (global build) -->
+  <link
+    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css"
+    rel="stylesheet">
+
+  <!-- Font Awesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+
+<nav class="navbar navbar-expand-lg navbar-dark mb-4">
+  <div class="container-fluid">
+    <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+      <i class="fas fa-calendar-alt me-2"></i>Shift Planner
+    </a>
+    <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
+      <span class="navbar-toggler-icon"></span>
+    </button>
+    <div class="collapse navbar-collapse" id="navbarNav">
+      <ul class="navbar-nav me-auto">
+        {% if session.get('role') == 'manager' %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.dashboard') }}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.manage_shifts') }}">Manage Shifts</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.team_view') }}">Team Row View</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.change_requests') }}">Change Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.swap_requests') }}">Swap Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('project.list_projects') }}">Projects</a></li>
+        {% elif session.get('role') == 'member' %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.dashboard') }}">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.my_schedule') }}">My Schedule</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.request_shift_change') }}">Request Change</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.request_swap') }}">Request Swap</a></li>
+        {% endif %}
+      </ul>
+      <ul class="navbar-nav">
+        {% if session.get('user_id') %}
+          <li class="nav-item">
+            <span class="navbar-text text-white me-3">
+              <i class="fas fa-user-circle me-2"></i>{{ session.get('name') }} <span class="badge" style="background: rgba(255,255,255,0.2);">{{ session.get('role')|title }}</span>
+            </span>
+          </li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+        {% else %}
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt me-2"></i>Login</a></li>
+          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}"><i class="fas fa-user-plus me-2"></i>Register</a></li>
+        {% endif %}
+      </ul>
+    </div>
+  </div>
+</nav>
+
+<div class="container mb-5 animate-fade-in">
+  {% with messages = get_flashed_messages(with_categories=true) %}
+    {% if messages %}
+      <div class="mt-3">
+        {% for category, message in messages %}
+          <div class="alert alert-{{ category }} alert-dismissible fade show animate-slide-in-right" role="alert">
+            {% if category == 'success' %}
+              {% set icon_name = 'check-circle' %}
+            {% elif category == 'danger' %}
+              {% set icon_name = 'exclamation-circle' %}
+            {% elif category == 'warning' %}
+              {% set icon_name = 'exclamation-triangle' %}
+            {% else %}
+              {% set icon_name = 'info-circle' %}
+            {% endif %}
+            <i class="fas fa-{{ icon_name }} me-2"></i>
+            {{ message }}
+            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+          </div>
+        {% endfor %}
+      </div>
+    {% endif %}
+  {% endwith %}
+
+  {% block content %}{% endblock %}
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
+
+{% block scripts %}{% endblock %}
+</body>
+</html>

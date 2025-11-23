@@ -1,0 +1,48 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <title>Shift Schedule</title>
+  <style>
+    body { font-family: system-ui, sans-serif; font-size: 12px; }
+    table { border-collapse: collapse; width: 100%; }
+    th, td { border: 1px solid #333; padding: 4px 6px; }
+    th { background: #eee; }
+    @media print {
+      button { display: none; }
+    }
+  </style>
+</head>
+<body>
+  <button onclick="window.print()">Print / Save as PDF</button>
+  <h3>Shift Schedule</h3>
+  <table>
+    <tr>
+      <th>Date</th>
+      <th>User</th>
+      <th>Project</th>
+      <th>Shift</th>
+      <th>Start</th>
+      <th>End</th>
+      <th>Task</th>
+    </tr>
+    {% for s in shifts %}
+    <tr>
+      <td>{{ s.date }}</td>
+      <td>{{ users_map[s.user_id|string] }}</td>
+      <td>
+        {% if s.project_id %}
+          {{ projects_map[s.project_id|string] }}
+        {% else %}
+          General
+        {% endif %}
+      </td>
+      <td><span class="badge shift-badge-{{ s.shift_code }}" style="padding: 2px 6px; border-radius: 3px;">{{ s.shift_code }}</span></td>
+      <td>{{ s.start_time }}</td>
+      <td>{{ s.end_time }}</td>
+      <td>{{ s.task }}</td>
+    </tr>
+    {% endfor %}
+  </table>
+</body>
+</html>

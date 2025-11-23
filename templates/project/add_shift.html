@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="animate-fade-in-up">
+  <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Add Shift to {{ project.name }}</h2>
+  <p class="text-muted mb-4">Assign a shift to this project</p>
+
+  <form method="post" class="glass-card p-4">
+    <div class="row">
+      <div class="col-md-6 mb-3">
+        <label class="form-label fw-semibold">User</label>
+        <select name="user_id" class="form-select" required>
+          <option value="">Select a team member</option>
+          {% for u in users %}
+          <option value="{{ u._id }}">{{ u.name }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div class="col-md-6 mb-3">
+        <label class="form-label fw-semibold">Date</label>
+        <input type="date" name="date" class="form-control" required>
+      </div>
+    </div>
+
+    <div class="row">
+      <div class="col-md-3 mb-3">
+        <label class="form-label fw-semibold">Shift Code</label>
+        <select name="shift_code" class="form-select" required>
+          <option value="A">A</option>
+          <option value="B">B</option>
+          <option value="C">C</option>
+          <option value="G">G</option>
+        </select>
+      </div>
+
+      <div class="col-md-3 mb-3">
+        <label class="form-label fw-semibold">Start Time</label>
+        <input type="time" name="start_time" class="form-control" value="09:00">
+      </div>
+
+      <div class="col-md-3 mb-3">
+        <label class="form-label fw-semibold">End Time</label>
+        <input type="time" name="end_time" class="form-control" value="17:00">
+      </div>
+
+      <div class="col-md-3 mb-3">
+        <label class="form-label fw-semibold">Task</label>
+        <input type="text" name="task" class="form-control" placeholder="Task description">
+      </div>
+    </div>
+
+    <div class="d-flex gap-2 mt-4">
+      <button class="btn btn-warning"><i class="fas fa-save me-2"></i>Save Shift</button>
+      <a href="{{ url_for('project.view_project', project_id=project._id) }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

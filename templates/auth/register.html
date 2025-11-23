@@ -1,0 +1,82 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="row justify-content-center">
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h3 class="mb-3">Register</h3>
+        <form method="post">
+          <div class="row g-3">
+            <div class="col-md-6">
+              <label class="form-label">Name</label>
+              <input type="text" name="name" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Phone</label>
+              <input type="text" name="phone" class="form-control">
+            </div>
+            <div class="col-md-12">
+              <label class="form-label">Email</label>
+              <input type="email" name="email" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Password</label>
+              <input type="password" name="password" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Confirm Password</label>
+              <input type="password" name="confirm" class="form-control" required>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Role</label>
+              <select name="role" id="roleSelect" class="form-select" required>
+                <option value="member">Team Member</option>
+                <option value="manager">Manager</option>
+              </select>
+            </div>
+            <div class="col-md-6">
+              <label class="form-label">Manager Secret Key (only for Manager)</label>
+              <input type="password" name="manager_key" class="form-control" placeholder="Only if role = manager">
+            </div>
+            <div class="col-md-12" id="projectSelection" style="display: none;">
+              <label class="form-label">Register Under Project(s) <small class="text-muted">(Select one or more projects)</small></label>
+              <div class="form-check-group" style="max-height: 150px; overflow-y: auto; border: 1px solid #dee2e6; border-radius: 0.375rem; padding: 0.75rem;">
+                {% if projects %}
+                  {% for p in projects %}
+                  <div class="form-check">
+                    <input class="form-check-input" type="checkbox" name="project_ids" value="{{ p._id }}" id="project_{{ p._id }}">
+                    <label class="form-check-label" for="project_{{ p._id }}">
+                      {{ p.name }}
+                    </label>
+                  </div>
+                  {% endfor %}
+                {% else %}
+                  <p class="text-muted mb-0">No projects available. Contact your manager.</p>
+                {% endif %}
+              </div>
+            </div>
+          </div>
+          <button class="btn btn-primary w-100 mt-3">Register</button>
+          <script>
+            document.getElementById('roleSelect').addEventListener('change', function() {
+              const projectSelection = document.getElementById('projectSelection');
+              if (this.value === 'member') {
+                projectSelection.style.display = 'block';
+              } else {
+                projectSelection.style.display = 'none';
+              }
+            });
+          </script>
+        </form>
+        <p class="mt-3 text-muted small">
+          After registering you can log in immediately with your credentials.
+        </p>
+        <p class="mt-3 mb-0">
+          Already have an account?
+          <a href="{{ url_for('auth.login') }}">Login here</a>.
+        </p>
+      </div>
+    </div>
+  </div>
+</div>
+{% endblock %}

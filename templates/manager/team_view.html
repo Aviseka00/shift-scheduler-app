@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Team Row-wise View</h3>
+<p class="text-muted">Each row is an employee. Scroll within each row to see the week’s shifts.</p>
+
+<div class="row g-3">
+  {% for u in users %}
+  <div class="col-12">
+    <div class="card mb-2">
+      <div class="card-body">
+        <h6 class="mb-2">{{ u.name }} ({{ u.email }})</h6>
+        <div id="cal-{{ u._id }}" class="mini-cal"></div>
+      </div>
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script type="application/json" id="users-data">
+{{ users | tojson }}
+</script>
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const usersData = JSON.parse(document.getElementById('users-data').textContent);
+  const apiUrl = "{{ url_for('manager.api_shifts') }}";
+
+  usersData.forEach(function(u) {
+    const userId = String(u._id);
+    const el = document.getElementById('cal-' + userId);
+    if (!el) return;
+    
+    const cal = new FullCalendar.Calendar(el, {
+      initialView: 'timeGridWeek',
+      height: 200,
+      slotMinTime: '06:00:00',
+      slotMaxTime: '23:00:00',
+      headerToolbar: { left: '', center: '', right: '' },
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const params = new URLSearchParams();
+        params.append('user_id', userId);
+        fetch(apiUrl + '?' + params.toString())
+          .then(function(r) { return r.json(); })
+          .then(function(data) { successCallback(data); })
+          .catch(function(err) { failureCallback(err); });
+      },
+      eventDidMount: function(info) {
+        if (info.event.extendedProps.tooltip) {
+          info.el.title = info.event.extendedProps.tooltip;
+        }
+      }
+    });
+    cal.render();
+  });
+});
+</script>
+{% endblock %}

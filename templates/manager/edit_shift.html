@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block content %}
+
+<h3 class="mb-4">Edit Shift</h3>
+
+<div class="card shadow-sm">
+  <div class="card-body">
+    <form method="post">
+      <div class="row g-3">
+        <div class="col-md-3">
+          <label class="form-label">Date</label>
+          <input type="date" class="form-control" name="date"
+                 value="{{ shift.date }}" required>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Shift Code</label>
+          <select name="shift_code" class="form-select" required>
+            <option value="A" {% if shift.shift_code == 'A' %}selected{% endif %}>A</option>
+            <option value="B" {% if shift.shift_code == 'B' %}selected{% endif %}>B</option>
+            <option value="C" {% if shift.shift_code == 'C' %}selected{% endif %}>C</option>
+            <option value="G" {% if shift.shift_code == 'G' %}selected{% endif %}>G</option>
+          </select>
+        </div>
+
+        <div class="col-md-3">
+          <label class="form-label">Project</label>
+          <select name="project_id" class="form-select">
+            <option value="">General</option>
+            {% for p in projects %}
+            <option value="{{ p._id }}"
+              {% if shift.project_id and p._id == shift.project_id %}selected{% endif %}>
+              {{ p.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">Start Time</label>
+          <input type="time" class="form-control" name="start_time"
+                 value="{{ shift.start_time }}" required>
+        </div>
+
+        <div class="col-md-2">
+          <label class="form-label">End Time</label>
+          <input type="time" class="form-control" name="end_time"
+                 value="{{ shift.end_time }}" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Task</label>
+          <input type="text" class="form-control" name="task"
+                 value="{{ shift.task }}" required>
+        </div>
+
+        <div class="col-md-6">
+          <label class="form-label">Assign To (User)</label>
+          <select name="user_id" id="userSelect" class="form-select" required>
+            {% for u in users %}
+            <option value="{{ u._id }}"
+                    {% if u._id == shift.user_id %}selected{% endif %}>
+              {{ u.name }} ({{ u.email }})
+            </option>
+            {% endfor %}
+          </select>
+          {% if shift_project_id %}
+          <div class="form-check mt-2">
+            <input class="form-check-input" type="checkbox" id="showAllUsers" 
+                   {% if show_all %}checked{% endif %}
+                   onchange="toggleUserFilter()">
+            <label class="form-check-label" for="showAllUsers" style="font-size: 0.875rem;">
+              Show all members from other projects
+            </label>
+          </div>
+          {% endif %}
+        </div>
+        <script type="application/json" id="all-users-data">
+        {{ all_users_json | tojson }}
+        </script>
+        <script type="application/json" id="project-users-data">
+        {{ users_json | tojson }}
+        </script>
+        <script>
+          const allUsersData = JSON.parse(document.getElementById('all-users-data').textContent);
+          const projectUsersData = JSON.parse(document.getElementById('project-users-data').textContent);
+          
+          function toggleUserFilter() {
+            const showAll = document.getElementById('showAllUsers').checked;
+            const userSelect = document.getElementById('userSelect');
+            const currentValue = userSelect.value;
+            
+            // Clear current options
+            userSelect.innerHTML = '<option value="">Select Member</option>';
+            
+            // Add users based on filter
+            const usersToShow = showAll ? allUsersData : projectUsersData;
+            usersToShow.forEach(function(u) {
+              const option = document.createElement('option');
+              option.value = String(u._id);
+              option.textContent = u.name + ' (' + u.email + ')';
+              if (String(u._id) == currentValue) {
+                option.selected = true;
+              }
+              userSelect.appendChild(option);
+            });
+            
+            // Update URL parameter
+            const url = new URL(window.location.href);
+            if (showAll) {
+              url.searchParams.set('show_all', 'true');
+            } else {
+              url.searchParams.delete('show_all');
+            }
+            window.history.replaceState({}, '', url);
+          }
+        </script>
+      </div>
+
+      <button class="btn btn-primary mt-4">Save Changes</button>
+      <a href="{{ url_for('manager.dashboard') }}" class="btn btn-outline-secondary mt-4 ms-2">
+        Cancel
+      </a>
+    </form>
+  </div>
+</div>
+
+{% endblock %}

@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block content %}
+<h3>Request Shift Swap</h3>
+
+<form method="post" class="card p-3 shadow-sm">
+  <div class="mb-3">
+    <label class="form-label">Swap With</label>
+    <select name="target_user" class="form-select" required>
+      {% for u in users %}
+      {% if u._id != session.get("user_id") %}
+      <option value="{{ u._id }}">{{ u.name }} ({{ u.email }})</option>
+      {% endif %}
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Date</label>
+    <input type="date" name="date" class="form-control" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Reason</label>
+    <textarea name="reason" class="form-control" rows="3"></textarea>
+  </div>
+
+  <button class="btn btn-primary w-100">Submit</button>
+</form>
+{% endblock %}

@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">My Schedule</h3>
+
+<div id="myCalendar" class="bg-white p-2 rounded shadow-sm" style="min-height: 600px"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener("DOMContentLoaded", function () {
+  const cal = new FullCalendar.Calendar(document.getElementById("myCalendar"), {
+    initialView: window.innerWidth < 768 ? "dayGridMonth" : "timeGridWeek",
+    height: "auto",
+    nowIndicator: true,
+    headerToolbar: {
+      left: "prev,next today",
+      center: "title",
+      right: "dayGridMonth,timeGridWeek,timeGridDay"
+    },
+    events: "{{ url_for('member.api_my_shifts') }}"
+  });
+
+  cal.render();
+});
+</script>
+{% endblock %}

@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="animate-fade-in-up">
+  <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Create New Project</h2>
+  <p class="text-muted mb-4">Add a new project with start and end dates</p>
+
+  <form method="post" class="glass-card p-4">
+  <div class="mb-3">
+    <label class="form-label">Project Name</label>
+    <input name="name" class="form-control" required>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label">Description</label>
+    <textarea name="description" class="form-control" rows="3"></textarea>
+  </div>
+
+  <div class="row">
+    <div class="col-md-6 mb-3">
+      <label class="form-label fw-semibold">Start Date</label>
+      <input type="date" name="start_date" class="form-control" required>
+    </div>
+    <div class="col-md-6 mb-3">
+      <label class="form-label fw-semibold">End Date</label>
+      <input type="date" name="end_date" class="form-control" required>
+    </div>
+  </div>
+
+    <div class="d-flex gap-2 mt-3">
+      <button class="btn btn-primary"><i class="fas fa-plus me-2"></i>Create Project</button>
+      <a href="{{ url_for('project.list_projects') }}" class="btn btn-outline-secondary">Cancel</a>
+    </div>
+  </form>
+</div>
+{% endblock %}

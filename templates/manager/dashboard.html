@@ -1,0 +1,208 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="animate-fade-in-up">
+  <div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+      <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Manager Dashboard</h2>
+      <p class="text-muted mb-0">Overview of your shift management system</p>
+    </div>
+  </div>
+
+  <div class="row mb-4">
+    <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.1s;">
+      <div class="stat-card stat-card-primary">
+        <h6>Total Users</h6>
+        <h3>{{ users_count }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.2s;">
+      <div class="stat-card stat-card-success">
+        <h6>Total Shifts</h6>
+        <h3>{{ shifts_count }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.3s;">
+      <div class="stat-card stat-card-info">
+        <h6>Total Projects</h6>
+        <h3>{{ project_count }}</h3>
+      </div>
+    </div>
+    <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.4s;">
+      <div class="stat-card stat-card-warning">
+        <h6>Pending Requests</h6>
+        <h3>{{ pending_change + pending_swap }}</h3>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.5s;">
+  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+    <div>
+      <h4 class="mb-1" style="font-weight: 700; color: #2d3748;">Team Schedule</h4>
+      <p class="text-muted mb-0 small">Visualize and manage all team shifts</p>
+    </div>
+    <div class="d-flex flex-wrap gap-2">
+      <a href="{{ url_for('manager.export_csv') }}" class="btn btn-sm btn-outline-success">
+        📊 Export CSV
+      </a>
+      <a href="{{ url_for('manager.export_print') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
+        🖨️ Print PDF
+      </a>
+      <a href="{{ url_for('project.create_project') }}" class="btn btn-sm btn-primary">
+        ➕ New Project
+      </a>
+    </div>
+  </div>
+
+  <form class="row g-3 mb-4" method="post" action="{{ url_for('manager.auto_roster') }}">
+    <div class="col-md-3 col-6">
+      <label class="form-label fw-semibold">Start Date</label>
+      <input type="date" name="start_date" class="form-control" required>
+    </div>
+    <div class="col-md-3 col-6">
+      <label class="form-label fw-semibold">End Date</label>
+      <input type="date" name="end_date" class="form-control" required>
+    </div>
+    <div class="col-md-3 col-6">
+      <label class="form-label fw-semibold">Project</label>
+      <select name="project_id" class="form-select">
+        <option value="">General</option>
+        {% for p in projects %}
+        <option value="{{ p._id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+    <div class="col-md-3 col-6 d-flex align-items-end">
+      <button class="btn btn-primary w-100">✨ Auto-generate Roster</button>
+    </div>
+  </form>
+
+  <div class="shift-legend mb-4">
+  <div class="shift-legend-item">
+    <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
+    <small><strong>Shift A</strong></small>
+  </div>
+  <div class="shift-legend-item">
+    <span class="shift-legend-color" style="background-color: #198754;"></span>
+    <small><strong>Shift B</strong></small>
+  </div>
+  <div class="shift-legend-item">
+    <span class="shift-legend-color" style="background-color: #ffc107;"></span>
+    <small><strong>Shift C</strong></small>
+  </div>
+  <div class="shift-legend-item">
+    <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
+    <small><strong>Shift G</strong></small>
+  </div>
+</div>
+
+  <div class="row mb-4">
+    <div class="col-md-4">
+      <label class="form-label fw-semibold">Filter by Project</label>
+      <select id="projectFilter" class="form-select">
+        <option value="">All Projects</option>
+        {% for p in projects %}
+        <option value="{{ p._id }}">{{ p.name }}</option>
+        {% endfor %}
+      </select>
+    </div>
+  </div>
+</div>
+
+<div class="glass-card p-3 mb-3 animate-fade-in-up" style="animation-delay: 0.6s;">
+  <p class="mb-0 text-center">
+    <span class="badge" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">💡 Tip</span>
+    <span class="ms-2">Click on any shift in the calendar to <strong>edit</strong> its time, user, project or task. You can also drag and resize events to adjust timings.</span>
+  </p>
+</div>
+
+<div id="managerCalendar" class="animate-fade-in-up" style="min-height: 600px; animation-delay: 0.7s;"></div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  const calendarEl = document.getElementById('managerCalendar');
+  const projectFilter = document.getElementById('projectFilter');
+
+  const editUrlTemplate = "{{ url_for('manager.edit_shift', shift_id='__ID__') }}";
+
+  function buildCalendar(initialView) {
+    return new FullCalendar.Calendar(calendarEl, {
+      initialView: initialView,
+      height: 'auto',
+      slotMinTime: '06:00:00',
+      slotMaxTime: '23:00:00',
+      expandRows: true,
+      nowIndicator: true,
+      editable: true,
+      eventDurationEditable: true,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const params = new URLSearchParams();
+        const projectId = projectFilter.value;
+        if (projectId) {
+          params.append('project_id', projectId);
+        }
+        fetch("{{ url_for('manager.api_shifts') }}?" + params.toString())
+          .then(response => response.json())
+          .then(data => successCallback(data))
+          .catch(err => failureCallback(err));
+      },
+      eventClick: function(info) {
+        const shiftId = info.event.extendedProps.shift_id;
+        if (shiftId) {
+          const url = editUrlTemplate.replace('__ID__', shiftId);
+          window.location.href = url;
+        }
+      },
+      eventDidMount: function(info) {
+        if (info.event.extendedProps.tooltip) {
+          info.el.title = info.event.extendedProps.tooltip;
+        }
+      },
+      eventDrop: function(info) {
+        saveShiftMove(info);
+      },
+      eventResize: function(info) {
+        saveShiftMove(info);
+      }
+    });
+  }
+
+  const isMobile = window.innerWidth < 768;
+  let calendar = buildCalendar(isMobile ? 'dayGridMonth' : 'timeGridWeek');
+  calendar.render();
+
+  projectFilter.addEventListener('change', function() {
+    calendar.refetchEvents();
+  });
+
+  function saveShiftMove(info) {
+    fetch("{{ url_for('manager.api_update_shift') }}", {
+      method: "POST",
+      headers: {"Content-Type": "application/json"},
+      body: JSON.stringify({
+        id: info.event.id,
+        start: info.event.start.toISOString(),
+        end: (info.event.end || info.event.start).toISOString()
+      })
+    }).then(res => res.json()).then(data => {
+      if (!data.success) {
+        alert("Failed to save move: " + (data.error || "Unknown error"));
+        info.revert();
+      }
+    }).catch(err => {
+      alert("Error saving move");
+      info.revert();
+    });
+  }
+});
+</script>
+{% endblock %}
