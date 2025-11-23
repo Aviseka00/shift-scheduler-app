@@ -2,7 +2,7 @@ import os
 from urllib.parse import quote_plus
 
 def _fix_mongo_uri(uri):
-    """Fix MongoDB URI by properly encoding username and password."""
+    """Fix MongoDB URI by properly encoding username and password and ensuring SSL parameters."""
     if not uri:
         return uri
     
@@ -31,6 +31,23 @@ def _fix_mongo_uri(uri):
                 # URL encode username and password (handle special chars like @, ., etc.)
                 encoded_username = quote_plus(username)
                 encoded_password = quote_plus(password)
+                
+                # Ensure SSL/TLS parameters are present for Atlas
+                # Split host_part into host and query string
+                if "?" in host_part:
+                    host, query = host_part.split("?", 1)
+                    # Add SSL parameters if not present
+                    if "tls=true" not in query and "ssl=true" not in query:
+                        query += "&tls=true&tlsAllowInvalidCertificates=false"
+                    if "retryWrites" not in query:
+                        query += "&retryWrites=true"
+                    if "w=majority" not in query:
+                        query += "&w=majority"
+                    host_part = f"{host}?{query}"
+                else:
+                    # No query string, add one
+                    host_part = f"{host_part}?tls=true&retryWrites=true&w=majority"
+                
                 # Reconstruct URI
                 return f"{prefix}{encoded_username}:{encoded_password}@{host_part}"
     except Exception as e:
