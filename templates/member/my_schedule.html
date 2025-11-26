@@ -1,8 +1,92 @@
 {% extends "base.html" %}
+
 {% block content %}
 <h3 class="mb-3">My Schedule</h3>
 
-<div id="myCalendar" class="bg-white p-2 rounded shadow-sm" style="min-height: 600px"></div>
+<div class="row">
+  <!-- Calendar -->
+  <div class="col-lg-9 mb-3">
+    <div id="myCalendar"
+         class="bg-white p-2 rounded shadow-sm"
+         style="min-height: 600px;"></div>
+  </div>
+
+  <!-- Side Panel: Legend + Team Info -->
+  <div class="col-lg-3">
+    <!-- Legend -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-2">Legend</h6>
+        <ul class="list-unstyled small mb-0">
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#28a745;">&nbsp;</span>
+            <strong>Me</strong> – my own shifts & tasks
+          </li>
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#0d6efd;">&nbsp;</span>
+            <strong>Teammates</strong> – shifts of members in my project(s)
+          </li>
+          <li class="mt-2 mb-1"><strong>Shift Colors</strong></li>
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#0d6efd;">&nbsp;</span>
+            A Shift
+          </li>
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#198754;">&nbsp;</span>
+            B Shift
+          </li>
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#ffc107; color:#000;">&nbsp;</span>
+            C Shift
+          </li>
+          <li class="mb-1">
+            <span class="badge rounded-pill me-2" style="background-color:#6f42c1;">&nbsp;</span>
+            G / General Shift
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <!-- Projects -->
+    <div class="card mb-3 shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-2">My Project(s)</h6>
+        {% if projects %}
+          <ul class="list-unstyled small mb-0">
+            {% for p in projects %}
+            <li class="mb-1">• {{ p.name }}</li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted small mb-0">
+            You are not assigned to any specific project.
+          </p>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Teammates -->
+    <div class="card shadow-sm">
+      <div class="card-body">
+        <h6 class="fw-semibold mb-2">My Team Members</h6>
+        {% if teammates %}
+          <ul class="list-unstyled small mb-0">
+            {% for t in teammates %}
+            <li class="mb-1">
+              • {{ t.name }}
+              {% if t.email %}<br><span class="text-muted">{{ t.email }}</span>{% endif %}
+            </li>
+            {% endfor %}
+          </ul>
+        {% else %}
+          <p class="text-muted small mb-0">
+            No teammates found in your project(s).
+          </p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 {% endblock %}
 
 {% block scripts %}
@@ -17,7 +101,8 @@ document.addEventListener("DOMContentLoaded", function () {
       center: "title",
       right: "dayGridMonth,timeGridWeek,timeGridDay"
     },
-    events: "{{ url_for('member.api_my_shifts') }}"
+    events: "{{ url_for('member.api_my_shifts') }}",
+    eventDisplay: "block"
   });
 
   cal.render();
