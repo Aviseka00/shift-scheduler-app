@@ -447,6 +447,87 @@ def project_members():
 
 
 # =========================================================
+# SHIFT-WISE VIEW (GROUP BY SHIFT CODE)
+# =========================================================
+@manager_bp.route("/shift-wise-view", endpoint="shift_wise_view")
+@manager_required
+def shift_wise_view():
+    selected_date = request.args.get("date") or datetime.now().strftime("%Y-%m-%d")
+    selected_project = request.args.get("project_id")
+    sort_alphabetical = request.args.get("sort") == "alphabetical"
+    
+    # Build query
+    query = {"date": selected_date}
+    if selected_project:
+        query["project_id"] = ObjectId(selected_project)
+    
+    # Get all shifts for the selected date
+    shifts = list(mongo.db.shifts.find(query))
+    
+    # Get all users and projects for mapping
+    all_users = list(mongo.db.users.find())
+    users_map = {str(u["_id"]): u for u in all_users}
+    projects_map = {str(p["_id"]): p["name"] for p in mongo.db.projects.find()}
+    
+    # Group shifts by shift code
+    shift_groups = {
+        "A": [],
+        "B": [],
+        "C": [],
+        "G": []
+    }
+    
+    for shift in shifts:
+        shift_code = shift.get("shift_code", "")
+        if shift_code in shift_groups:
+            user_id = str(shift.get("user_id"))
+            user = users_map.get(user_id)
+            if user:
+                shift_info = {
+                    "shift_id": str(shift["_id"]),
+                    "user_id": user_id,
+                    "user_name": user.get("name", "Unknown"),
+                    "user_email": user.get("email", ""),
+                    "project_id": str(shift.get("project_id")) if shift.get("project_id") else None,
+                    "project_name": projects_map.get(str(shift.get("project_id")), "General") if shift.get("project_id") else "General",
+                    "task": shift.get("task", ""),
+                    "start_time": shift.get("start_time", ""),
+                    "end_time": shift.get("end_time", "")
+                }
+                shift_groups[shift_code].append(shift_info)
+    
+    # Sort alphabetically if requested
+    if sort_alphabetical:
+        for shift_code in shift_groups:
+            shift_groups[shift_code].sort(key=lambda x: x["user_name"].lower())
+    
+    # Get counts
+    shift_counts = {code: len(members) for code, members in shift_groups.items()}
+    total_members = sum(shift_counts.values())
+    
+    # Get all projects for filter
+    projects = list(mongo.db.projects.find().sort("name", 1))
+    for p in projects:
+        p["_id"] = str(p["_id"])
+    
+    # Get today's date for date input
+    from datetime import date
+    today_date = date.today().isoformat()
+    
+    return render_template(
+        "manager/shift_wise_view.html",
+        shift_groups=shift_groups,
+        shift_counts=shift_counts,
+        total_members=total_members,
+        selected_date=selected_date,
+        selected_project=selected_project,
+        projects=projects,
+        sort_alphabetical=sort_alphabetical,
+        today_date=today_date,
+    )
+
+
+# =========================================================
 # EXPORT CSV
 # =========================================================
 @manager_bp.route("/export/csv", endpoint="export_csv")
@@ -729,6 +810,10 @@ def manage_shifts():
             s["user_id"] = str(s["user_id"])
         if s.get("project_id"):
             s["project_id"] = str(s["project_id"])
+    
+    # Sort shifts by shift code in order: A, G, B, C
+    shift_order = {"A": 1, "G": 2, "B": 3, "C": 4}
+    shifts.sort(key=lambda x: (shift_order.get(x.get("shift_code", ""), 99), x.get("date", ""), x.get("start_time", "")))
 
     tasks = []
     if selected_project:

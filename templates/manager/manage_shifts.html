@@ -243,7 +243,32 @@
           </tr>
         </thead>
         <tbody>
+          {% set current_shift = "" %}
           {% for s in shifts %}
+            {% if current_shift != s.shift_code %}
+              {% set current_shift = s.shift_code %}
+              <tr class="table-group-header" style="background: 
+                {% if s.shift_code == 'A' %}rgba(13, 110, 253, 0.15)
+                {% elif s.shift_code == 'G' %}rgba(111, 66, 193, 0.15)
+                {% elif s.shift_code == 'B' %}rgba(25, 135, 84, 0.15)
+                {% elif s.shift_code == 'C' %}rgba(255, 193, 7, 0.15)
+                {% else %}rgba(0, 0, 0, 0.05){% endif %}; border-top: 2px solid 
+                {% if s.shift_code == 'A' %}#0d6efd
+                {% elif s.shift_code == 'G' %}#6f42c1
+                {% elif s.shift_code == 'B' %}#198754
+                {% elif s.shift_code == 'C' %}#ffc107
+                {% else %}#6c757d{% endif %};">
+                <td colspan="8" class="fw-bold py-2">
+                  <i class="fas fa-clock me-2"></i>
+                  Shift {{ s.shift_code }} 
+                  {% if s.shift_code == 'A' %}(06:00 - 14:30)
+                  {% elif s.shift_code == 'G' %}(09:00 - 17:30)
+                  {% elif s.shift_code == 'B' %}(14:00 - 22:30)
+                  {% elif s.shift_code == 'C' %}(22:00 - 06:00)
+                  {% endif %}
+                </td>
+              </tr>
+            {% endif %}
           <tr>
             <td>{{ s.date }}</td>
             <td>
@@ -256,7 +281,16 @@
                 General
               {% endif %}
             </td>
-            <td><span class="badge bg-primary">{{ s.shift_code }}</span></td>
+            <td>
+              <span class="badge 
+                {% if s.shift_code == 'A' %}bg-primary
+                {% elif s.shift_code == 'G' %}bg-info text-dark
+                {% elif s.shift_code == 'B' %}bg-success
+                {% elif s.shift_code == 'C' %}bg-warning text-dark
+                {% else %}bg-secondary{% endif %}">
+                {{ s.shift_code }}
+              </span>
+            </td>
             <td>{{ s.start_time }}</td>
             <td>{{ s.end_time }}</td>
             <td>{{ s.task or "-" }}</td>
