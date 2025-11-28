@@ -42,11 +42,129 @@
   </div>
 </div>
 
-<!-- ADD SHIFT FORM -->
+<!-- BULK SHIFT ASSIGNMENT -->
+<div class="card shadow-sm mb-4" style="border: 2px solid #667eea;">
+  <div class="card-body">
+    <h5 class="mb-3" style="color: #667eea;">
+      <i class="fas fa-users me-1"></i> Bulk Shift Assignment (Fast Mode)
+    </h5>
+    <p class="text-muted small mb-3">
+      Select multiple members, choose project/shift/date once, and assign shifts to all selected members at once.
+    </p>
+    
+    <form method="post" id="bulkShiftForm">
+      <input type="hidden" name="action" value="bulk_add_shifts">
+      
+      <!-- Project, Shift, Date Selection -->
+      <div class="row g-3 mb-4">
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Project *</label>
+          <select name="bulk_project_id" id="bulkProject" class="form-select" required>
+            <option value="">Select Project</option>
+            {% for p in projects %}
+            <option value="{{ p._id }}"
+              {% if selected_project and selected_project|string == p._id|string %}selected{% endif %}>
+              {{ p.name }}
+            </option>
+            {% endfor %}
+          </select>
+        </div>
+        
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Shift Code *</label>
+          <select name="bulk_shift_code" id="bulkShift" class="form-select" required>
+            <option value="">Select shift</option>
+            <option value="A">A (06:00 – 14:30)</option>
+            <option value="B">B (14:00 – 22:30)</option>
+            <option value="C">C (22:00 – 06:00 next day)</option>
+            <option value="G">G (09:00 – 17:30)</option>
+          </select>
+        </div>
+        
+        <div class="col-md-4">
+          <label class="form-label fw-bold">Date *</label>
+          <input type="date" name="bulk_date" id="bulkDate" class="form-control" required min="{{ today_date }}">
+        </div>
+        
+        <div class="col-12">
+          <label class="form-label">Task / Notes (Optional)</label>
+          <input type="text" name="bulk_task" class="form-control" placeholder="Optional task details for all selected members">
+        </div>
+      </div>
+      
+      <!-- Member Selection with Checkboxes -->
+      <div class="mb-3">
+        <div class="d-flex justify-content-between align-items-center mb-2">
+          <label class="form-label fw-bold mb-0">Select Members *</label>
+          <div>
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllMembers()">
+              <i class="fas fa-check-square me-1"></i> Select All
+            </button>
+            <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllMembers()">
+              <i class="fas fa-square me-1"></i> Deselect All
+            </button>
+          </div>
+        </div>
+        
+        <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
+          <table class="table table-sm table-hover mb-0">
+            <thead class="table-light sticky-top">
+              <tr>
+                <th style="width: 50px;">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleAllMembers(this)">
+                </th>
+                <th>Member Name</th>
+                <th>Email</th>
+                <th>Projects</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for u in users %}
+              <tr>
+                <td>
+                  <input type="checkbox" name="selected_members" value="{{ u._id }}" class="member-checkbox">
+                </td>
+                <td><strong>{{ u.name }}</strong></td>
+                <td><small class="text-muted">{{ u.email }}</small></td>
+                <td>
+                  <small>
+                    {% if u.project_ids %}
+                      {% set project_names = [] %}
+                      {% for pid in u.project_ids %}
+                        {% for p in projects %}
+                          {% if p._id == pid %}
+                            {% set _ = project_names.append(p.name) %}
+                          {% endif %}
+                        {% endfor %}
+                      {% endfor %}
+                      {{ project_names|join(', ') or 'None' }}
+                    {% else %}
+                      <span class="text-muted">No projects</span>
+                    {% endif %}
+                  </small>
+                </td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        <small class="text-muted">
+          <span id="selectedCount">0</span> member(s) selected
+        </small>
+      </div>
+      
+      <button type="submit" class="btn btn-primary btn-lg w-100" id="bulkSubmitBtn">
+        <i class="fas fa-plus-circle me-2"></i> Assign Shifts to Selected Members
+      </button>
+    </form>
+  </div>
+</div>
+
+<!-- ADD SINGLE SHIFT FORM -->
 <div class="card shadow-sm mb-4">
   <div class="card-body">
     <h5 class="mb-3">
-      <i class="fas fa-calendar-plus me-1"></i> Add Shift
+      <i class="fas fa-calendar-plus me-1"></i> Add Single Shift
     </h5>
     <form method="post">
       <div class="row g-3">
@@ -129,24 +247,14 @@
           <tr>
             <td>{{ s.date }}</td>
             <td>
-              {% set member_name = "-" %}
-              {% for u in users %}
-                {% if u._id == s.user_id %}
-                  {% set member_name = u.name %}
-                {% endif %}
-              {% endfor %}
-              {{ member_name }}
+              {{ users_map[s.user_id|string] or "Unknown" }}
             </td>
             <td>
-              {% set proj_name = "General" %}
               {% if s.project_id %}
-                {% for p in projects %}
-                  {% if p._id == s.project_id %}
-                    {% set proj_name = p.name %}
-                  {% endif %}
-                {% endfor %}
+                {{ projects_map[s.project_id|string] or "General" }}
+              {% else %}
+                General
               {% endif %}
-              {{ proj_name }}
             </td>
             <td><span class="badge bg-primary">{{ s.shift_code }}</span></td>
             <td>{{ s.start_time }}</td>
@@ -180,4 +288,82 @@
   </div>
 </div>
 
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Update selected count
+function updateSelectedCount() {
+  const checkboxes = document.querySelectorAll('.member-checkbox:checked');
+  document.getElementById('selectedCount').textContent = checkboxes.length;
+  
+  // Enable/disable submit button
+  const submitBtn = document.getElementById('bulkSubmitBtn');
+  if (checkboxes.length === 0) {
+    submitBtn.disabled = true;
+    submitBtn.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i> Please select at least one member';
+  } else {
+    submitBtn.disabled = false;
+    submitBtn.innerHTML = `<i class="fas fa-plus-circle me-2"></i> Assign Shifts to ${checkboxes.length} Selected Member(s)`;
+  }
+}
+
+// Select all members
+function selectAllMembers() {
+  document.querySelectorAll('.member-checkbox').forEach(cb => {
+    cb.checked = true;
+  });
+  document.getElementById('selectAllCheckbox').checked = true;
+  updateSelectedCount();
+}
+
+// Deselect all members
+function deselectAllMembers() {
+  document.querySelectorAll('.member-checkbox').forEach(cb => {
+    cb.checked = false;
+  });
+  document.getElementById('selectAllCheckbox').checked = false;
+  updateSelectedCount();
+}
+
+// Toggle all members from header checkbox
+function toggleAllMembers(checkbox) {
+  document.querySelectorAll('.member-checkbox').forEach(cb => {
+    cb.checked = checkbox.checked;
+  });
+  updateSelectedCount();
+}
+
+// Individual checkbox change
+document.addEventListener('DOMContentLoaded', function() {
+  // Add event listeners to all member checkboxes
+  document.querySelectorAll('.member-checkbox').forEach(cb => {
+    cb.addEventListener('change', function() {
+      updateSelectedCount();
+      // Update select all checkbox state
+      const allChecked = document.querySelectorAll('.member-checkbox:checked').length === document.querySelectorAll('.member-checkbox').length;
+      document.getElementById('selectAllCheckbox').checked = allChecked;
+    });
+  });
+  
+  // Form validation
+  document.getElementById('bulkShiftForm').addEventListener('submit', function(e) {
+    const selected = document.querySelectorAll('.member-checkbox:checked').length;
+    if (selected === 0) {
+      e.preventDefault();
+      alert('Please select at least one member to assign shifts.');
+      return false;
+    }
+    
+    // Show confirmation
+    if (!confirm(`Assign shifts to ${selected} member(s)?`)) {
+      e.preventDefault();
+      return false;
+    }
+  });
+  
+  // Initial count update
+  updateSelectedCount();
+});
+</script>
 {% endblock %}

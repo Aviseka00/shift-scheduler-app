@@ -368,7 +368,7 @@ def project_members():
         projects.append(p)
 
     members_data = []
-    
+
     if selected_project:
         try:
             pid = ObjectId(selected_project)
@@ -534,6 +534,80 @@ def manage_shifts():
     if request.method == "POST":
         action = request.form.get("action")
 
+        # ---------------- BULK SHIFT ASSIGNMENT ----------------
+        if action == "bulk_add_shifts":
+            project_id = request.form.get("bulk_project_id")
+            shift_code = request.form.get("bulk_shift_code")
+            date_str = request.form.get("bulk_date")
+            task = request.form.get("bulk_task", "")
+            selected_members = request.form.getlist("selected_members")
+            
+            if not project_id or not shift_code or not date_str:
+                flash("Please fill in all required fields (Project, Shift, Date).", "danger")
+                redirect_url = url_for("manager.manage_shifts")
+                if selected_project:
+                    redirect_url += f"?project_id={selected_project}"
+                return redirect(redirect_url)
+            
+            if not selected_members:
+                flash("Please select at least one member.", "danger")
+                redirect_url = url_for("manager.manage_shifts")
+                if selected_project:
+                    redirect_url += f"?project_id={selected_project}"
+                return redirect(redirect_url)
+            
+            start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("09:00", "17:00"))
+            success_count = 0
+            conflict_count = 0
+            skipped_count = 0
+            
+            for user_id in selected_members:
+                # Check for existing shift
+                existing_shift = mongo.db.shifts.find_one({
+                    "date": date_str,
+                    "user_id": ObjectId(user_id)
+                })
+                
+                if existing_shift:
+                    conflict_count += 1
+                    continue
+                
+                # Create shift
+                doc = {
+                    "date": date_str,
+                    "user_id": ObjectId(user_id),
+                    "shift_code": shift_code,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "task": task,
+                    "project_id": ObjectId(project_id),
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow()
+                }
+                
+                mongo.db.shifts.insert_one(doc)
+                
+                # Send notification
+                mongo.db.notifications.insert_one({
+                    "user_id": ObjectId(user_id),
+                    "message": f"You have been assigned a {shift_code} shift on {date_str}.",
+                    "created_at": datetime.utcnow(),
+                    "read": False,
+                })
+                
+                success_count += 1
+            
+            # Flash message with results
+            if success_count > 0:
+                flash(f"Successfully assigned shifts to {success_count} member(s)!", "success")
+            if conflict_count > 0:
+                flash(f"{conflict_count} member(s) already had shifts on this date and were skipped.", "warning")
+            
+            redirect_url = url_for("manager.manage_shifts", date=date_str)
+            if selected_project:
+                redirect_url += f"&project_id={selected_project}"
+            return redirect(redirect_url)
+
         # ---------------- TASK CREATION ----------------
         if action == "add_task":
             task_name = request.form.get("task_name")
@@ -647,6 +721,14 @@ def manage_shifts():
         query["project_id"] = ObjectId(selected_project)
 
     shifts = list(mongo.db.shifts.find(query).sort("date", 1))
+    
+    # Convert shift _id and user_id to strings for template
+    for s in shifts:
+        s["_id"] = str(s["_id"])
+        if s.get("user_id"):
+            s["user_id"] = str(s["user_id"])
+        if s.get("project_id"):
+            s["project_id"] = str(s["project_id"])
 
     tasks = []
     if selected_project:
@@ -670,6 +752,12 @@ def manage_shifts():
     from datetime import date
     today_date = date.today().isoformat()
     
+    # Convert user _id to string for template (for bulk assignment checkboxes)
+    for u in users:
+        u["_id"] = str(u["_id"])
+        if u.get("project_ids"):
+            u["project_ids"] = [str(pid) for pid in u["project_ids"]]
+
     return render_template(
         "manager/manage_shifts.html",
         users=users,
