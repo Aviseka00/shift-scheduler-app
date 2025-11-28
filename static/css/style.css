@@ -2,6 +2,60 @@
    MODERN ELEGANT UI STYLES
    ============================================ */
 
+/* Form Validation Styles */
+.is-invalid {
+  border-color: #dc3545 !important;
+  padding-right: calc(1.5em + 0.75rem);
+  background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12' width='12' height='12' fill='none' stroke='%23dc3545'%3e%3ccircle cx='6' cy='6' r='4.5'/%3e%3cpath d='m5.8 3.6 .4.4.4-.4m0 4.8-.4-.4-.4.4'/%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right calc(0.375em + 0.1875rem) center;
+  background-size: calc(0.75em + 0.375rem) calc(0.75em + 0.375rem);
+}
+
+.invalid-feedback {
+  display: block;
+  width: 100%;
+  margin-top: 0.25rem;
+  font-size: 0.875em;
+  color: #dc3545;
+}
+
+.form-validation-error {
+  animation: slideInDown 0.3s ease-out;
+}
+
+@keyframes slideInDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Loading Spinner for Buttons */
+button:disabled .spinner-border-sm {
+  width: 1rem;
+  height: 1rem;
+  border-width: 0.15em;
+}
+
+/* Enhanced Today Button Styling */
+.fc-today-button {
+  font-weight: 600 !important;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+  border: none !important;
+  color: white !important;
+}
+
+.fc-today-button:hover {
+  background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
 :root {
   --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
@@ -22,11 +76,112 @@
 }
 
 body {
-  background: linear-gradient(135deg, #667eea 0%, #764ba2 50%, #f093fb 100%);
+  background: linear-gradient(180deg, 
+    #000000 0%, 
+    #0a0a1a 10%, 
+    #1a1a3a 20%, 
+    #0066ff 30%, 
+    #0080ff 40%, 
+    #00aaff 50%, 
+    #ff6600 60%, 
+    #ff3300 70%, 
+    #00ff66 80%, 
+    #00cc55 90%, 
+    #00aa44 100%);
   background-attachment: fixed;
+  background-size: 100% 200%;
+  animation: gradientShift 20s ease infinite;
   min-height: 100vh;
   font-family: 'Inter', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  color: #2d3748;
+  color: #ffffff;
+  position: relative;
+}
+
+/* Animated gradient background */
+@keyframes gradientShift {
+  0% {
+    background-position: 0% 0%;
+  }
+  50% {
+    background-position: 0% 100%;
+  }
+  100% {
+    background-position: 0% 0%;
+  }
+}
+
+/* Shining blue effect at top */
+body::before {
+  content: '';
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background-image: 
+    radial-gradient(circle at 30% 20%, rgba(0, 102, 255, 0.4) 0%, transparent 50%),
+    radial-gradient(circle at 70% 30%, rgba(0, 150, 255, 0.3) 0%, transparent 60%),
+    radial-gradient(circle at 50% 10%, rgba(0, 200, 255, 0.5) 0%, transparent 40%),
+    linear-gradient(180deg, rgba(0, 102, 255, 0.2) 0%, transparent 100%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  pointer-events: none;
+  z-index: 0;
+  animation: shinePulse 3s ease-in-out infinite;
+}
+
+/* Shining pulse animation for blue */
+@keyframes shinePulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 0.9;
+  }
+}
+
+/* Orange, red, green glow at bottom */
+body::after {
+  content: '';
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 50%;
+  background-image: 
+    radial-gradient(circle at 20% 80%, rgba(255, 102, 0, 0.4) 0%, transparent 50%),
+    radial-gradient(circle at 50% 70%, rgba(255, 51, 0, 0.5) 0%, transparent 60%),
+    radial-gradient(circle at 80% 90%, rgba(0, 255, 102, 0.4) 0%, transparent 55%),
+    radial-gradient(circle at 60% 85%, rgba(0, 204, 85, 0.3) 0%, transparent 50%),
+    linear-gradient(0deg, rgba(255, 102, 0, 0.2) 0%, transparent 50%),
+    linear-gradient(0deg, rgba(255, 51, 0, 0.15) 0%, transparent 50%),
+    linear-gradient(0deg, rgba(0, 255, 102, 0.2) 0%, transparent 50%);
+  background-size: 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%, 100% 100%;
+  pointer-events: none;
+  z-index: 0;
+  animation: colorPulse 4s ease-in-out infinite;
+}
+
+/* Color pulse animation for bottom colors */
+@keyframes colorPulse {
+  0%, 100% {
+    opacity: 0.7;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Ensure content appears above background */
+.container,
+.container-fluid {
+  position: relative;
+  z-index: 1;
+}
+
+/* Ensure cards appear above background */
+.card {
+  position: relative;
+  z-index: 1;
 }
 
 /* ============================================
@@ -86,12 +241,15 @@ body {
    ============================================ */
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.95);
+  position: relative;
+  z-index: 1;
+  background: linear-gradient(135deg, rgba(135, 206, 250, 0.95) 0%, rgba(255, 182, 193, 0.95) 50%, rgba(144, 238, 144, 0.95) 100%);
   backdrop-filter: blur(20px);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.5);
   border-radius: 20px;
-  box-shadow: var(--shadow-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 102, 255, 0.3), 0 0 30px rgba(255, 102, 0, 0.2);
   transition: all 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  color: #1a1a2e;
 }
 
 .glass-card:hover {
@@ -101,13 +259,16 @@ body {
 }
 
 .card {
+  position: relative;
+  z-index: 1;
   border: none;
   border-radius: 16px;
-  box-shadow: var(--shadow-md);
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.3), 0 0 15px rgba(0, 102, 255, 0.25), 0 0 20px rgba(255, 102, 0, 0.15);
   transition: all 0.3s ease;
   overflow: hidden;
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.95) 0%, rgba(255, 218, 185, 0.95) 50%, rgba(152, 251, 152, 0.95) 100%);
   backdrop-filter: blur(10px);
+  color: #1a1a2e;
 }
 
 .card:hover {
@@ -235,7 +396,7 @@ body {
 .btn-outline-primary,
 .btn-outline-success,
 .btn-outline-secondary {
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(173, 216, 230, 0.9) 0%, rgba(255, 218, 185, 0.9) 100%);
   backdrop-filter: blur(10px);
   border: 2px solid;
 }
@@ -258,10 +419,11 @@ body {
 .form-control,
 .form-select {
   border-radius: 12px;
-  border: 2px solid rgba(0, 0, 0, 0.1);
+  border: 2px solid rgba(0, 102, 255, 0.3);
   padding: 0.75rem 1rem;
   transition: all 0.3s ease;
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(230, 240, 255, 0.95) 0%, rgba(255, 240, 230, 0.95) 100%);
+  color: #1a1a2e;
 }
 
 .form-control:focus,
@@ -312,7 +474,7 @@ body {
    ============================================ */
 
 .table {
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(230, 240, 255, 0.95) 0%, rgba(255, 240, 230, 0.95) 100%);
   backdrop-filter: blur(10px);
   border-radius: 16px;
   overflow: hidden;
@@ -382,12 +544,12 @@ body {
 #managerCalendar,
 #memberCalendar,
 #myCalendar {
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(173, 216, 250, 0.95) 0%, rgba(255, 200, 200, 0.95) 50%, rgba(200, 255, 200, 0.95) 100%);
   backdrop-filter: blur(20px);
   border-radius: 20px;
   padding: 1.5rem;
-  box-shadow: var(--shadow-lg);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3), 0 0 20px rgba(0, 102, 255, 0.3), 0 0 30px rgba(255, 102, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.5);
 }
 
 .fc-event {
@@ -452,10 +614,10 @@ body {
   flex-wrap: wrap;
   margin-bottom: 1.5rem;
   padding: 1rem;
-  background: rgba(255, 255, 255, 0.9);
+  background: linear-gradient(135deg, rgba(200, 230, 255, 0.9) 0%, rgba(255, 220, 200, 0.9) 50%, rgba(200, 255, 220, 0.9) 100%);
   backdrop-filter: blur(10px);
   border-radius: 16px;
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2), 0 0 10px rgba(0, 102, 255, 0.2);
 }
 
 .shift-legend-item {
@@ -463,14 +625,16 @@ body {
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
-  background: rgba(255, 255, 255, 0.5);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.7) 0%, rgba(240, 250, 255, 0.7) 100%);
   border-radius: 12px;
   transition: all 0.3s ease;
+  border: 1px solid rgba(0, 102, 255, 0.2);
 }
 
 .shift-legend-item:hover {
-  background: rgba(255, 255, 255, 0.8);
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.95) 0%, rgba(240, 250, 255, 0.95) 100%);
   transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(0, 102, 255, 0.3);
 }
 
 .shift-legend-color {
@@ -544,11 +708,12 @@ body {
   border: none;
   border-radius: 12px !important;
   margin-bottom: 0.75rem;
-  background: rgba(255, 255, 255, 0.95);
+  background: linear-gradient(135deg, rgba(240, 248, 255, 0.95) 0%, rgba(255, 248, 240, 0.95) 50%, rgba(240, 255, 248, 0.95) 100%);
   backdrop-filter: blur(10px);
-  box-shadow: var(--shadow-sm);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.15), 0 0 8px rgba(0, 102, 255, 0.1);
   transition: all 0.3s ease;
-  border-left: 4px solid transparent;
+  border: 1px solid rgba(0, 102, 255, 0.2);
+  border-left: 4px solid rgba(0, 102, 255, 0.4);
 }
 
 .list-group-item:hover {

@@ -1,6 +1,15 @@
-from datetime import datetime, timedelta
+import os
 import csv
 import io
+from datetime import datetime, timedelta
+
+# Optional import for Excel support
+try:
+    from openpyxl import load_workbook
+    OPENPYXL_AVAILABLE = True
+except ImportError:
+    OPENPYXL_AVAILABLE = False
+    load_workbook = None
 
 from flask import (
     render_template,
@@ -11,13 +20,33 @@ from flask import (
     session,
     jsonify,
     Response,
+    current_app,
 )
+from werkzeug.utils import secure_filename
 from bson.objectid import ObjectId
 
 from . import manager_bp
 from extensions import mongo
 
 
+# =========================================================
+# FILE UPLOAD HELPER (for profile picture)
+# =========================================================
+def allowed_file(filename):
+    """
+    Check if the uploaded file has an allowed extension.
+    Uses ALLOWED_EXTENSIONS from app config.
+    """
+    return (
+        "." in filename
+        and filename.rsplit(".", 1)[1].lower()
+        in current_app.config.get("ALLOWED_EXTENSIONS", set())
+    )
+
+
+# =========================================================
+# AUTH HELPERS
+# =========================================================
 def login_required(f):
     from functools import wraps
 
@@ -25,7 +54,7 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             flash("Please login first.", "warning")
-            return redirect(url_for("auth.login"))
+            return redirect("/login")
         return f(*args, **kwargs)
 
     return decorated
@@ -38,12 +67,15 @@ def manager_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session or session.get("role") != "manager":
             flash("Manager access required.", "danger")
-            return redirect(url_for("auth.login"))
+            return redirect("/login")
         return f(*args, **kwargs)
 
     return decorated
 
 
+# =========================================================
+# SHIFT HELPERS
+# =========================================================
 def check_shift_conflict(user_id, date_str, exclude_shift_id=None):
     """
     Check if a user already has a shift on the given date.
@@ -51,21 +83,20 @@ def check_shift_conflict(user_id, date_str, exclude_shift_id=None):
     """
     query = {
         "user_id": ObjectId(user_id) if isinstance(user_id, str) else user_id,
-        "date": date_str
+        "date": date_str,
     }
-    
     existing_shift = mongo.db.shifts.find_one(query)
-    
+
     if existing_shift:
         # If we're updating an existing shift, exclude it from conflict check
         if exclude_shift_id and str(existing_shift["_id"]) == str(exclude_shift_id):
             return False, None
         return True, existing_shift
-    
+
     return False, None
 
 
-# Color map for calendar events by shift code (fallback)
+# Color map for calendar events by shift code
 SHIFT_COLORS = {
     "A": "#0d6efd",  # blue
     "B": "#198754",  # green
@@ -73,14 +104,27 @@ SHIFT_COLORS = {
     "G": "#6f42c1",  # purple
 }
 
+# OFFICIAL SHIFT TIMINGS (24-hour format)
+SHIFT_TIMINGS = {
+    "A": ("06:00", "14:30"),  # 6 AM → 2:30 PM
+    "B": ("14:00", "22:30"),  # 2 PM → 10:30 PM
+    "C": ("22:00", "06:00"),  # 10 PM → 6 AM NEXT DAY
+    "G": ("09:00", "17:30"),  # 9 AM → 5:30 PM
+}
 
-@manager_bp.route("/dashboard", methods=["GET"])
+
+# =========================================================
+# MANAGER DASHBOARD
+# =========================================================
+@manager_bp.route("/dashboard", methods=["GET"], endpoint="dashboard")
 @manager_required
 def dashboard():
     users_count = mongo.db.users.count_documents({})
     shifts_count = mongo.db.shifts.count_documents({})
     project_count = mongo.db.projects.count_documents({})
-    pending_change = mongo.db.shift_change_requests.count_documents({"status": "pending"})
+    pending_change = mongo.db.shift_change_requests.count_documents(
+        {"status": "pending"}
+    )
     pending_swap = mongo.db.shift_swap_requests.count_documents({"status": "pending"})
 
     projects = list(mongo.db.projects.find().sort("created_at", -1))
@@ -99,7 +143,10 @@ def dashboard():
     )
 
 
-@manager_bp.route("/auto-roster", methods=["POST"])
+# =========================================================
+# AUTO ROSTER (USES OFFICIAL SHIFT TIMINGS)
+# =========================================================
+@manager_bp.route("/auto-roster", methods=["POST"], endpoint="auto_roster")
 @manager_required
 def auto_roster():
     start_date_str = request.form.get("start_date")
@@ -127,60 +174,38 @@ def auto_roster():
 
     day = start_date
     while day <= end_date:
-        # Example: two shifts per day (A, B)
-        shift_templates = {
-            "A": ("08:00", "16:00"),
-            "B": ("16:00", "23:00"),
-        }
-        for shift_code, (start_t, end_t) in shift_templates.items():
+        date_str = day.isoformat()
+
+        # Loop over each shift code (A, B, C, G)
+        for shift_code, (start_t, end_t) in SHIFT_TIMINGS.items():
             user_id = member_ids[idx % len(member_ids)]
             idx += 1
 
-            date_str = day.isoformat()
-            
-            # Check for existing shift on this date for this user
-            existing_shift = mongo.db.shifts.find_one({
-                "date": date_str,
-                "user_id": user_id
-            })
-            
-            if existing_shift:
-                # Update existing shift instead of creating duplicate
-                doc = {
-                    "date": date_str,
-                    "user_id": user_id,
-                    "shift_code": shift_code,
-                    "start_time": start_t,
-                    "end_time": end_t,
-                    "task": f"{shift_code} shift",
-                    "updated_at": datetime.utcnow(),
-                }
-                if project_id:
-                    doc["project_id"] = ObjectId(project_id)
-                else:
-                    doc["project_id"] = None
+            existing_shift = mongo.db.shifts.find_one(
+                {"date": date_str, "user_id": user_id}
+            )
 
+            doc = {
+                "date": date_str,
+                "user_id": user_id,
+                "shift_code": shift_code,
+                "start_time": start_t,
+                "end_time": end_t,
+                "task": f"{shift_code} shift",
+                "updated_at": datetime.utcnow(),
+            }
+            if project_id:
+                doc["project_id"] = ObjectId(project_id)
+            else:
+                doc["project_id"] = None
+
+            if existing_shift:
                 mongo.db.shifts.update_one(
                     {"_id": existing_shift["_id"]},
-                    {"$set": doc}
+                    {"$set": doc},
                 )
             else:
-                # Create new shift
-                doc = {
-                    "date": date_str,
-                    "user_id": user_id,
-                    "shift_code": shift_code,
-                    "start_time": start_t,
-                    "end_time": end_t,
-                    "task": f"{shift_code} shift",
-                    "updated_at": datetime.utcnow(),
-                    "created_at": datetime.utcnow(),
-                }
-                if project_id:
-                    doc["project_id"] = ObjectId(project_id)
-                else:
-                    doc["project_id"] = None
-
+                doc["created_at"] = datetime.utcnow()
                 mongo.db.shifts.insert_one(doc)
 
         day += timedelta(days=1)
@@ -189,7 +214,10 @@ def auto_roster():
     return redirect(url_for("manager.dashboard"))
 
 
-@manager_bp.route("/api/shifts")
+# =========================================================
+# API: SHIFTS FOR MANAGER CALENDAR
+# =========================================================
+@manager_bp.route("/api/shifts", endpoint="api_shifts")
 @manager_required
 def api_shifts():
     """
@@ -207,7 +235,8 @@ def api_shifts():
 
     shifts_cursor = mongo.db.shifts.find(query)
 
-    users_map = {str(u["_id"]): u["name"] for u in mongo.db.users.find()}
+    users_list = list(mongo.db.users.find())
+    users_map = {str(u["_id"]): {"name": u.get("name", "Unknown"), "profile_pic": u.get("profile_picture", "default.png")} for u in users_list}
     projects_map = {str(p["_id"]): p["name"] for p in mongo.db.projects.find()}
 
     events = []
@@ -215,20 +244,28 @@ def api_shifts():
         date_str = s["date"]  # "YYYY-MM-DD"
         start_time = s.get("start_time") or "09:00"
         end_time = s.get("end_time") or "17:00"
+        shift_code = s.get("shift_code", "")
+
+        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
         start = f"{date_str}T{start_time}:00"
-        end = f"{date_str}T{end_time}:00"
+
+        # Night shift: C → end next day
+        if shift_code == "C":
+            end_date = date_obj + timedelta(days=1)
+            end = f"{end_date.isoformat()}T{end_time}:00"
+        else:
+            end = f"{date_str}T{end_time}:00"
 
         uid = str(s["user_id"])
         pid = str(s.get("project_id")) if s.get("project_id") else None
 
-        user_name = users_map.get(uid, "Unknown")
+        user_info = users_map.get(uid, {"name": "Unknown", "profile_pic": "default.png"})
+        user_name = user_info["name"]
+        profile_pic = user_info["profile_pic"]
         project_name = projects_map.get(pid, "General") if pid else "General"
-        shift_code = s.get("shift_code", "")
         task = s.get("task", "")
 
-        # Color by shift code (A, B, C, G)
         color = SHIFT_COLORS.get(shift_code, "#0dcaf0")
-
         tooltip = f"{user_name} • {project_name} • {shift_code} • {task}"
 
         events.append(
@@ -242,6 +279,8 @@ def api_shifts():
                 "extendedProps": {
                     "shift_id": str(s["_id"]),
                     "user": user_name,
+                    "user_id": uid,
+                    "profile_pic": profile_pic,
                     "project": project_name,
                     "task": task,
                     "shift_code": shift_code,
@@ -253,11 +292,15 @@ def api_shifts():
     return jsonify(events)
 
 
-@manager_bp.route("/api/update-shift", methods=["POST"])
+# =========================================================
+# API: CALENDAR DRAG/RESIZE UPDATE
+# =========================================================
+@manager_bp.route("/api/update-shift", methods=["POST"], endpoint="api_update_shift")
 @manager_required
 def api_update_shift():
     """
     Update shift date/time when dragged or resized on the calendar.
+    (Keeps whatever times user drags to; does not snap back to template.)
     """
     data = request.get_json(force=True)
     shift_id = data.get("id")
@@ -277,23 +320,21 @@ def api_update_shift():
     start_time = start_dt.strftime("%H:%M")
     end_time = end_dt.strftime("%H:%M")
 
-    # Get current shift to check user
     current_shift = mongo.db.shifts.find_one({"_id": ObjectId(shift_id)})
     if not current_shift:
         return jsonify({"success": False, "error": "Shift not found"}), 404
 
-    # Check for conflict if date changed
     if current_shift.get("date") != date_str:
-        has_conflict, conflicting_shift = check_shift_conflict(
-            current_shift["user_id"], 
-            date_str, 
-            exclude_shift_id=shift_id
+        has_conflict, _ = check_shift_conflict(
+            current_shift["user_id"], date_str, exclude_shift_id=shift_id
         )
         if has_conflict:
-            return jsonify({
-                "success": False, 
-                "error": f"User already has a shift on {date_str}. Cannot move shift to this date."
-            }), 400
+            return jsonify(
+                {
+                    "success": False,
+                    "error": f"User already has a shift on {date_str}. Cannot move shift to this date.",
+                }
+            ), 400
 
     mongo.db.shifts.update_one(
         {"_id": ObjectId(shift_id)},
@@ -310,23 +351,107 @@ def api_update_shift():
     return jsonify({"success": True})
 
 
-@manager_bp.route("/team-view")
+# =========================================================
+# TEAM VIEW (MANAGER – PROJECT FILTER)
+# =========================================================
+@manager_bp.route("/project-members", endpoint="project_members")
 @manager_required
-def team_view():
-    users = list(mongo.db.users.find({"role": "member"}))
-    # Convert ObjectId to string for JSON serialization
-    for u in users:
-        u["_id"] = str(u["_id"])
-    return render_template("manager/team_view.html", users=users)
+def project_members():
+    selected_project = request.args.get("project_id")
+    selected_date = request.args.get("date") or datetime.now().strftime("%Y-%m-%d")
+
+    # Get all projects and convert IDs to string
+    projects_raw = list(mongo.db.projects.find().sort("name", 1))
+    projects = []
+    for p in projects_raw:
+        p["_id"] = str(p["_id"])
+        projects.append(p)
+
+    members_data = []
+    
+    if selected_project:
+        try:
+            pid = ObjectId(selected_project)
+            # Get all members allocated to this project
+            members = list(
+                mongo.db.users.find(
+                    {"role": "member", "project_ids": pid}
+                )
+            )
+            
+            # Get shifts for this project and date range (current week)
+            from datetime import timedelta
+            start_date = datetime.strptime(selected_date, "%Y-%m-%d")
+            end_date = start_date + timedelta(days=6)
+            start_str = start_date.strftime("%Y-%m-%d")
+            end_str = end_date.strftime("%Y-%m-%d")
+            
+            # Get all shifts for this project in the date range
+            shifts = list(mongo.db.shifts.find({
+                "project_id": pid,
+                "date": {"$gte": start_str, "$lte": end_str}
+            }).sort("date", 1))
+            
+            # Get project tasks
+            tasks = list(mongo.db.project_tasks.find({
+                "project_id": pid
+            }))
+            
+            # Organize data by member
+            members_map = {str(m["_id"]): m for m in members}
+            for member in members:
+                member_id = str(member["_id"])
+                member["_id"] = member_id
+                
+                # Get shifts for this member in this project
+                member_shifts = []
+                for s in shifts:
+                    if str(s.get("user_id")) == member_id:
+                        # Convert ObjectIds to strings for template
+                        s["_id"] = str(s["_id"])
+                        if s.get("user_id"):
+                            s["user_id"] = str(s["user_id"])
+                        if s.get("project_id"):
+                            s["project_id"] = str(s["project_id"])
+                        member_shifts.append(s)
+                
+                # Get tasks assigned to this member
+                member_tasks = []
+                for t in tasks:
+                    if str(t.get("assigned_to")) == member_id:
+                        # Convert ObjectIds to strings for template
+                        t["_id"] = str(t["_id"])
+                        if t.get("project_id"):
+                            t["project_id"] = str(t["project_id"])
+                        if t.get("assigned_to"):
+                            t["assigned_to"] = str(t["assigned_to"])
+                        member_tasks.append(t)
+                
+                members_data.append({
+                    "member": member,
+                    "shifts": member_shifts,
+                    "tasks": member_tasks,
+                    "shift_count": len(member_shifts),
+                    "task_count": len(member_tasks)
+                })
+        except Exception as e:
+            selected_project = None
+
+    return render_template(
+        "manager/project_members.html",
+        members_data=members_data,
+        projects=projects,
+        selected_project=selected_project,
+        selected_date=selected_date,
+    )
 
 
-@manager_bp.route("/export/csv")
+# =========================================================
+# EXPORT CSV
+# =========================================================
+@manager_bp.route("/export/csv", endpoint="export_csv")
 @manager_required
 def export_csv():
-    """
-    Export all shifts as CSV (Excel compatible).
-    Optional filter: ?project_id=...
-    """
     project_id = request.args.get("project_id")
     query = {}
     if project_id:
@@ -363,7 +488,10 @@ def export_csv():
     )
 
 
-@manager_bp.route("/export/print")
+# =========================================================
+# EXPORT PRINT VIEW
+# =========================================================
+@manager_bp.route("/export/print", endpoint="export_print")
 @manager_required
 def export_print():
     project_id = request.args.get("project_id")
@@ -383,69 +511,71 @@ def export_print():
     )
 
 
-@manager_bp.route("/manage-shifts", methods=["GET", "POST"])
+# =========================================================
+# MANAGE SHIFTS (MANUAL ADD + TASKS, AUTO TIME)
+# =========================================================
+@manager_bp.route("/manage-shifts", methods=["GET", "POST"], endpoint="manage_shifts")
 @manager_required
 def manage_shifts():
     projects = list(mongo.db.projects.find())
     selected_date = request.args.get("date")
     selected_project = request.args.get("project_id")
     show_all_members = request.args.get("show_all", "false") == "true"
-    
-    # Get members - filter by project if selected and not showing all
+
     if selected_project and not show_all_members:
-        # Get members registered under this project
-        users = list(mongo.db.users.find({
-            "role": "member",
-            "project_ids": ObjectId(selected_project)
-        }))
+        users = list(
+            mongo.db.users.find(
+                {"role": "member", "project_ids": ObjectId(selected_project)}
+            )
+        )
     else:
-        # Get all members
         users = list(mongo.db.users.find({"role": "member"}))
 
     if request.method == "POST":
         action = request.form.get("action")
-        
-        # Handle task creation
+
+        # ---------------- TASK CREATION ----------------
         if action == "add_task":
             task_name = request.form.get("task_name")
             assigned_to = request.form.get("assigned_to")
             due_date = request.form.get("due_date")
             project_id = request.form.get("project_id")
-            
+
             if not project_id:
                 flash("Please select a project.", "danger")
                 return redirect(url_for("manager.manage_shifts"))
-            
-            mongo.db.project_tasks.insert_one({
-                "project_id": ObjectId(project_id),
-                "task_name": task_name,
-                "assigned_to": ObjectId(assigned_to),
-                "due_date": due_date,
-                "created_at": datetime.utcnow()
-            })
-            
-            # Notify user of new task
-            mongo.db.notifications.insert_one({
-                "user_id": ObjectId(assigned_to),
-                "message": f"New task '{task_name}' assigned to you for project.",
-                "project_id": ObjectId(project_id),
-                "created_at": datetime.utcnow(),
-                "read": False,
-            })
-            
+
+            mongo.db.project_tasks.insert_one(
+                {
+                    "project_id": ObjectId(project_id),
+                    "task_name": task_name,
+                    "assigned_to": ObjectId(assigned_to),
+                    "due_date": due_date,
+                    "created_at": datetime.utcnow(),
+                }
+            )
+
+            mongo.db.notifications.insert_one(
+                {
+                    "user_id": ObjectId(assigned_to),
+                    "message": f"New task '{task_name}' assigned to you for project.",
+                    "project_id": ObjectId(project_id),
+                    "created_at": datetime.utcnow(),
+                    "read": False,
+                }
+            )
+
             flash("Task added successfully!", "success")
             redirect_url = url_for("manager.manage_shifts")
             if selected_project:
                 redirect_url += f"?project_id={selected_project}"
             return redirect(redirect_url)
-        
-        # Handle shift creation/update (for both "add_shift" action and legacy form)
+
+        # ---------------- SHIFT CREATION / UPDATE (AUTO TIME) ----------------
         if action == "add_shift" or action is None:
             date_str = request.form.get("date")
             user_id = request.form.get("user_id")
             shift_code = request.form.get("shift_code")
-            start_time = request.form.get("start_time")
-            end_time = request.form.get("end_time")
             task = request.form.get("task")
             project_id = request.form.get("project_id") or None
 
@@ -456,125 +586,93 @@ def manage_shifts():
                     redirect_url += f"?project_id={selected_project}"
                 return redirect(redirect_url)
 
-            # Check for existing shift conflict
-            existing_shift = mongo.db.shifts.find_one({
-                "date": date_str,
-                "user_id": ObjectId(user_id)
-            })
-            
-            if existing_shift:
-                # Update existing shift
-                update_doc = {
-                    "date": date_str,
-                    "user_id": ObjectId(user_id),
-                    "shift_code": shift_code,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "task": task,
-                    "updated_at": datetime.utcnow(),
-                }
-                if project_id:
-                    update_doc["project_id"] = ObjectId(project_id)
-                else:
-                    update_doc["project_id"] = None
+            start_time, end_time = SHIFT_TIMINGS.get(
+                shift_code, ("09:00", "17:00")
+            )
 
+            existing_shift = mongo.db.shifts.find_one(
+                {"date": date_str, "user_id": ObjectId(user_id)}
+            )
+
+            doc = {
+                "date": date_str,
+                "user_id": ObjectId(user_id),
+                "shift_code": shift_code,
+                "start_time": start_time,
+                "end_time": end_time,
+                "task": task,
+                "updated_at": datetime.utcnow(),
+            }
+
+            if project_id:
+                doc["project_id"] = ObjectId(project_id)
+            else:
+                doc["project_id"] = None
+
+            if existing_shift:
                 mongo.db.shifts.update_one(
-                    {"_id": existing_shift["_id"]},
-                    {"$set": update_doc}
+                    {"_id": existing_shift["_id"]}, {"$set": doc}
                 )
-                
-                # Notify user of shift update
-                mongo.db.notifications.insert_one({
-                    "user_id": ObjectId(user_id),
-                    "message": f"Your shift on {date_str} has been updated.",
-                    "created_at": datetime.utcnow(),
-                    "read": False,
-                })
-                
+                mongo.db.notifications.insert_one(
+                    {
+                        "user_id": ObjectId(user_id),
+                        "message": f"Your shift on {date_str} has been updated.",
+                        "created_at": datetime.utcnow(),
+                        "read": False,
+                    }
+                )
                 flash("Shift updated successfully.", "success")
             else:
-                # Create new shift
-                update_doc = {
-                    "date": date_str,
-                    "user_id": ObjectId(user_id),
-                    "shift_code": shift_code,
-                    "start_time": start_time,
-                    "end_time": end_time,
-                    "task": task,
-                    "created_at": datetime.utcnow(),
-                    "updated_at": datetime.utcnow(),
-                }
-                if project_id:
-                    update_doc["project_id"] = ObjectId(project_id)
-                else:
-                    update_doc["project_id"] = None
-
-                mongo.db.shifts.insert_one(update_doc)
-                
-                # Notify user of new shift
-                mongo.db.notifications.insert_one({
-                    "user_id": ObjectId(user_id),
-                    "message": f"You have been assigned a shift on {date_str}.",
-                    "created_at": datetime.utcnow(),
-                    "read": False,
-                })
-                
+                doc["created_at"] = datetime.utcnow()
+                mongo.db.shifts.insert_one(doc)
+                mongo.db.notifications.insert_one(
+                    {
+                        "user_id": ObjectId(user_id),
+                        "message": f"You have been assigned a shift on {date_str}.",
+                        "created_at": datetime.utcnow(),
+                        "read": False,
+                    }
+                )
                 flash("Shift created successfully.", "success")
-            
+
             redirect_url = url_for("manager.manage_shifts", date=date_str)
             if selected_project:
                 redirect_url += f"&project_id={selected_project}"
             return redirect(redirect_url)
 
-    # Build query for shifts
     query = {}
     if selected_date:
         query["date"] = selected_date
     if selected_project:
         query["project_id"] = ObjectId(selected_project)
-    
-    # Get all shifts matching the query
+
     shifts = list(mongo.db.shifts.find(query).sort("date", 1))
-    
-    # Get tasks for selected project if filtering by project
+
     tasks = []
     if selected_project:
-        tasks = list(mongo.db.project_tasks.find({"project_id": ObjectId(selected_project)}).sort("created_at", -1))
-    
-    # Get all members for the "show all" option
+        tasks = list(
+            mongo.db.project_tasks.find({"project_id": ObjectId(selected_project)}).sort(
+                "created_at", -1
+            )
+        )
+
     all_members = list(mongo.db.users.find({"role": "member"}))
-    
-    # Convert ObjectId to string for JSON serialization
-    def convert_user_for_json(user):
-        user_dict = {
-            "_id": str(user["_id"]),
-            "name": user["name"],
-            "email": user.get("email", ""),
-            "role": user.get("role", "member"),
-            "project_ids": [str(pid) for pid in user.get("project_ids", [])] if user.get("project_ids") else []
-        }
-        return user_dict
-    
-    users_json = [convert_user_for_json(u) for u in users]
-    all_members_json = [convert_user_for_json(u) for u in all_members]
-    
-    # Create maps for easy lookup
-    users_map = {str(u["_id"]): u["name"] for u in all_members}  # Use all_members for complete map
+    users_map = {str(u["_id"]): u["name"] for u in all_members}
     projects_map = {str(p["_id"]): p["name"] for p in projects}
-    
+
     shifts_map = {}
     if selected_date:
-        # For backward compatibility
         cursor = mongo.db.shifts.find({"date": selected_date})
         for s in cursor:
             shifts_map[str(s["user_id"])] = s
 
+    # Get today's date for date input min attribute
+    from datetime import date
+    today_date = date.today().isoformat()
+    
     return render_template(
         "manager/manage_shifts.html",
-        users=users,  # Filtered members (by project or all)
-        users_json=users_json,  # JSON-serializable version
-        all_members=all_members,  # All members for "show all" option
-        all_members_json=all_members_json,  # JSON-serializable version
+        users=users,
         projects=projects,
         selected_date=selected_date,
         selected_project=selected_project,
@@ -584,10 +682,193 @@ def manage_shifts():
         tasks=tasks,
         users_map=users_map,
         projects_map=projects_map,
+        today_date=today_date,
     )
 
 
-@manager_bp.route("/edit-shift/<shift_id>", methods=["GET", "POST"])
+# =========================================================
+# EXCEL UPLOAD FOR BULK SHIFT IMPORT
+# =========================================================
+@manager_bp.route("/upload-excel", methods=["GET", "POST"], endpoint="upload_excel")
+@manager_required
+def upload_excel():
+    """
+    Upload Excel file to bulk import shifts.
+    Expected columns: Date, Member Name, Project, Shift (A/B/C/G), Task
+    """
+    if not OPENPYXL_AVAILABLE:
+        flash("Excel upload feature requires 'openpyxl' package. Please install it using: pip install openpyxl", "danger")
+        return redirect(url_for("manager.dashboard"))
+    
+    if request.method == "POST":
+        file = request.files.get("excel_file")
+        
+        if not file or file.filename == "":
+            flash("Please select an Excel file.", "danger")
+            return redirect(url_for("manager.upload_excel"))
+        
+        if not file.filename.endswith(('.xlsx', '.xls')):
+            flash("Invalid file type. Please upload an Excel file (.xlsx or .xls).", "danger")
+            return redirect(url_for("manager.upload_excel"))
+        
+        try:
+            # Load workbook
+            wb = load_workbook(file, data_only=True)
+            ws = wb.active
+            
+            # Get header row
+            headers = [cell.value for cell in ws[1]]
+            
+            # Expected columns (case-insensitive matching)
+            date_col = None
+            member_col = None
+            project_col = None
+            shift_col = None
+            task_col = None
+            
+            for idx, header in enumerate(headers, 1):
+                header_lower = str(header).lower() if header else ""
+                if "date" in header_lower:
+                    date_col = idx
+                elif "member" in header_lower or "name" in header_lower:
+                    member_col = idx
+                elif "project" in header_lower:
+                    project_col = idx
+                elif "shift" in header_lower:
+                    shift_col = idx
+                elif "task" in header_lower:
+                    task_col = idx
+            
+            if not all([date_col, member_col, shift_col]):
+                flash("Excel file must have Date, Member Name, and Shift columns.", "danger")
+                return redirect(url_for("manager.upload_excel"))
+            
+            # Get all users and projects for mapping
+            users_list = list(mongo.db.users.find({"role": "member"}))
+            users_map = {u.get("name", "").lower(): u["_id"] for u in users_list}
+            users_map.update({u.get("email", "").lower(): u["_id"] for u in users_list})
+            
+            projects_list = list(mongo.db.projects.find())
+            projects_map = {p.get("name", "").lower(): p["_id"] for p in projects_list}
+            
+            imported_count = 0
+            error_count = 0
+            errors = []
+            
+            # Process rows (skip header)
+            for row_idx, row in enumerate(ws.iter_rows(min_row=2, values_only=False), 2):
+                try:
+                    # Get values
+                    date_val = row[date_col - 1].value if date_col <= len(row) else None
+                    member_val = row[member_col - 1].value if member_col <= len(row) else None
+                    project_val = row[project_col - 1].value if project_col and project_col <= len(row) else None
+                    shift_val = row[shift_col - 1].value if shift_col <= len(row) else None
+                    task_val = row[task_col - 1].value if task_col and task_col <= len(row) else None
+                    
+                    # Skip empty rows
+                    if not date_val or not member_val or not shift_val:
+                        continue
+                    
+                    # Parse date
+                    date_str = None
+                    if isinstance(date_val, datetime):
+                        date_str = date_val.strftime("%Y-%m-%d")
+                    elif isinstance(date_val, str):
+                        date_formats = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d"]
+                        for fmt in date_formats:
+                            try:
+                                date_obj = datetime.strptime(date_val.strip(), fmt)
+                                date_str = date_obj.strftime("%Y-%m-%d")
+                                break
+                            except:
+                                continue
+                    
+                    if not date_str:
+                        errors.append(f"Row {row_idx}: Invalid date format '{date_val}'")
+                        error_count += 1
+                        continue
+                    
+                    # Find user
+                    member_key = str(member_val).strip().lower()
+                    user_id = users_map.get(member_key)
+                    if not user_id:
+                        errors.append(f"Row {row_idx}: Member '{member_val}' not found")
+                        error_count += 1
+                        continue
+                    
+                    # Find project (optional)
+                    project_id = None
+                    if project_val:
+                        project_key = str(project_val).strip().lower()
+                        project_id = projects_map.get(project_key)
+                    
+                    # Validate shift code
+                    shift_code = str(shift_val).strip().upper()
+                    if shift_code not in ["A", "B", "C", "G"]:
+                        errors.append(f"Row {row_idx}: Invalid shift code '{shift_code}'. Must be A, B, C, or G")
+                        error_count += 1
+                        continue
+                    
+                    # Get shift timings
+                    start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("09:00", "17:00"))
+                    
+                    # Check for existing shift
+                    existing = mongo.db.shifts.find_one({
+                        "user_id": user_id,
+                        "date": date_str
+                    })
+                    
+                    task_str = str(task_val).strip() if task_val else ""
+                    
+                    shift_doc = {
+                        "user_id": user_id,
+                        "date": date_str,
+                        "shift_code": shift_code,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "task": task_str,
+                        "project_id": project_id,
+                        "created_at": datetime.utcnow()
+                    }
+                    
+                    if existing:
+                        mongo.db.shifts.update_one(
+                            {"_id": existing["_id"]},
+                            {"$set": shift_doc}
+                        )
+                    else:
+                        mongo.db.shifts.insert_one(shift_doc)
+                    
+                    imported_count += 1
+                    
+                except Exception as e:
+                    errors.append(f"Row {row_idx}: {str(e)}")
+                    error_count += 1
+                    continue
+            
+            if imported_count > 0:
+                flash(f"Successfully imported {imported_count} shifts from Excel!", "success")
+            if error_count > 0:
+                flash(f"Encountered {error_count} errors during import. Check details below.", "warning")
+            
+            if errors:
+                session["excel_import_errors"] = errors[:20]  # Store first 20 errors
+            
+            return redirect(url_for("manager.upload_excel"))
+            
+        except Exception as e:
+            flash(f"Error processing Excel file: {str(e)}", "danger")
+            return redirect(url_for("manager.upload_excel"))
+    
+    # GET request - show upload form
+    import_errors = session.pop("excel_import_errors", [])
+    return render_template("manager/upload_excel.html", errors=import_errors)
+
+
+# =========================================================
+# EDIT SHIFT (AUTO-TIMING ON UPDATE)
+# =========================================================
+@manager_bp.route("/edit-shift/<shift_id>", methods=["GET", "POST"], endpoint="edit_shift")
 @manager_required
 def edit_shift(shift_id):
     shift = mongo.db.shifts.find_one({"_id": ObjectId(shift_id)})
@@ -596,43 +877,40 @@ def edit_shift(shift_id):
         return redirect(url_for("manager.dashboard"))
 
     projects = list(mongo.db.projects.find())
-    
-    # Get shift's project to filter members
     shift_project_id = shift.get("project_id")
     show_all = request.args.get("show_all", "false") == "true"
-    
-    # Get members - filter by project if shift has a project and not showing all
+
     if shift_project_id and not show_all:
-        users = list(mongo.db.users.find({
-            "role": "member",
-            "project_ids": shift_project_id
-        }))
-        # Also include the current shift's user even if not in project
+        users = list(
+            mongo.db.users.find(
+                {"role": "member", "project_ids": shift_project_id}
+            )
+        )
         current_user_id = shift.get("user_id")
         if current_user_id:
             current_user = mongo.db.users.find_one({"_id": current_user_id})
             if current_user and current_user not in users:
                 users.append(current_user)
     else:
-        # Get all members
         users = list(mongo.db.users.find({"role": "member"}))
 
     if request.method == "POST":
         date_str = request.form.get("date")
         user_id = request.form.get("user_id")
         shift_code = request.form.get("shift_code")
-        start_time = request.form.get("start_time")
-        end_time = request.form.get("end_time")
         task = request.form.get("task")
         project_id = request.form.get("project_id") or None
 
-        # Check for shift conflict (excluding current shift)
-        has_conflict, conflicting_shift = check_shift_conflict(user_id, date_str, exclude_shift_id=shift_id)
-        
+        start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("09:00", "17:00"))
+
+        has_conflict, _ = check_shift_conflict(
+            user_id, date_str, exclude_shift_id=shift_id
+        )
         if has_conflict:
-            user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
-            user_name = user["name"] if user else "Unknown"
-            flash(f"Conflict: {user_name} already has a shift on {date_str}. Please choose a different date or user.", "danger")
+            flash(
+                f"Conflict: user already has a shift on {date_str}.",
+                "danger",
+            )
             return redirect(url_for("manager.edit_shift", shift_id=shift_id))
 
         update_doc = {
@@ -649,7 +927,9 @@ def edit_shift(shift_id):
         else:
             update_doc["project_id"] = None
 
-        mongo.db.shifts.update_one({"_id": ObjectId(shift_id)}, {"$set": update_doc})
+        mongo.db.shifts.update_one(
+            {"_id": ObjectId(shift_id)}, {"$set": update_doc}
+        )
 
         mongo.db.notifications.insert_one(
             {
@@ -664,128 +944,111 @@ def edit_shift(shift_id):
         flash("Shift updated and user notified.", "success")
         return redirect(url_for("manager.dashboard"))
 
-    # Get all members for the show all option
     all_users = list(mongo.db.users.find({"role": "member"}))
-    
-    # Convert ObjectId to string for JSON serialization
-    def convert_user_for_json(user):
-        user_dict = {
-            "_id": str(user["_id"]),
-            "name": user["name"],
-            "email": user.get("email", ""),
-            "role": user.get("role", "member"),
-            "project_ids": [str(pid) for pid in user.get("project_ids", [])] if user.get("project_ids") else []
-        }
-        return user_dict
-    
-    users_json = [convert_user_for_json(u) for u in users]
-    all_users_json = [convert_user_for_json(u) for u in all_users]
-    
+
     return render_template(
         "manager/edit_shift.html",
         shift=shift,
         users=users,
-        users_json=users_json,  # JSON-serializable version
         all_users=all_users,
-        all_users_json=all_users_json,  # JSON-serializable version
         projects=projects,
         shift_project_id=shift_project_id,
         show_all=show_all,
     )
 
 
-# -----------------------------------------
+# =========================================================
 # DELETE SHIFT
-# -----------------------------------------
-@manager_bp.route("/delete-shift/<shift_id>", methods=["POST"])
+# =========================================================
+@manager_bp.route("/delete-shift/<shift_id>", methods=["POST"], endpoint="delete_shift")
 @manager_required
 def delete_shift(shift_id):
     shift = mongo.db.shifts.find_one({"_id": ObjectId(shift_id)})
     if not shift:
         flash("Shift not found.", "danger")
         return redirect(url_for("manager.manage_shifts"))
-    
+
     user_id = shift.get("user_id")
     date_str = shift.get("date", "")
-    
-    # Delete the shift
+
     mongo.db.shifts.delete_one({"_id": ObjectId(shift_id)})
-    
-    # Notify user of shift deletion
+
     if user_id:
-        mongo.db.notifications.insert_one({
-            "user_id": user_id,
-            "message": f"Your shift on {date_str} has been removed.",
-            "created_at": datetime.utcnow(),
-            "read": False,
-        })
-    
+        mongo.db.notifications.insert_one(
+            {
+                "user_id": user_id,
+                "message": f"Your shift on {date_str} has been removed.",
+                "created_at": datetime.utcnow(),
+                "read": False,
+            }
+        )
+
     flash("Shift deleted successfully.", "success")
     return redirect(url_for("manager.manage_shifts"))
 
 
-# -----------------------------------------
+# =========================================================
 # REASSIGN SHIFT
-# -----------------------------------------
-@manager_bp.route("/reassign-shift/<shift_id>", methods=["POST"])
+# =========================================================
+@manager_bp.route("/reassign-shift/<shift_id>", methods=["POST"], endpoint="reassign_shift")
 @manager_required
 def reassign_shift(shift_id):
     shift = mongo.db.shifts.find_one({"_id": ObjectId(shift_id)})
     if not shift:
         flash("Shift not found.", "danger")
         return redirect(url_for("manager.manage_shifts"))
-    
+
     new_user_id = request.form.get("new_user_id")
     if not new_user_id:
         flash("Please select a user to reassign.", "danger")
         return redirect(url_for("manager.edit_shift", shift_id=shift_id))
-    
+
     new_user_id = ObjectId(new_user_id)
     date_str = shift.get("date", "")
     old_user_id = shift.get("user_id")
-    
-    # Check for shift conflict with new user
-    has_conflict, conflicting_shift = check_shift_conflict(str(new_user_id), date_str, exclude_shift_id=shift_id)
-    
+
+    has_conflict, _ = check_shift_conflict(str(new_user_id), date_str, exclude_shift_id=shift_id)
     if has_conflict:
         user = mongo.db.users.find_one({"_id": new_user_id})
         user_name = user["name"] if user else "Unknown"
-        flash(f"Conflict: {user_name} already has a shift on {date_str}. Please choose a different user or date.", "danger")
+        flash(
+            f"Conflict: {user_name} already has a shift on {date_str}.",
+            "danger",
+        )
         return redirect(url_for("manager.edit_shift", shift_id=shift_id))
-    
-    # Update shift with new user
+
     mongo.db.shifts.update_one(
         {"_id": ObjectId(shift_id)},
-        {
-            "$set": {
-                "user_id": new_user_id,
-                "updated_at": datetime.utcnow(),
-            }
-        }
+        {"$set": {"user_id": new_user_id, "updated_at": datetime.utcnow()}},
     )
-    
-    # Notify old user
+
     if old_user_id:
-        mongo.db.notifications.insert_one({
-            "user_id": old_user_id,
-            "message": f"Your shift on {date_str} has been reassigned to another member.",
+        mongo.db.notifications.insert_one(
+            {
+                "user_id": old_user_id,
+                "message": f"Your shift on {date_str} has been reassigned.",
+                "created_at": datetime.utcnow(),
+                "read": False,
+            }
+        )
+
+    mongo.db.notifications.insert_one(
+        {
+            "user_id": new_user_id,
+            "message": f"You have been assigned a shift on {date_str}.",
             "created_at": datetime.utcnow(),
             "read": False,
-        })
-    
-    # Notify new user
-    mongo.db.notifications.insert_one({
-        "user_id": new_user_id,
-        "message": f"You have been assigned a shift on {date_str}.",
-        "created_at": datetime.utcnow(),
-        "read": False,
-    })
-    
+        }
+    )
+
     flash("Shift reassigned successfully.", "success")
     return redirect(url_for("manager.manage_shifts"))
 
 
-@manager_bp.route("/change-requests", methods=["GET", "POST"])
+# =========================================================
+# CHANGE REQUESTS
+# =========================================================
+@manager_bp.route("/change-requests", methods=["GET", "POST"], endpoint="change_requests")
 @manager_required
 def change_requests():
     if request.method == "POST":
@@ -802,24 +1065,26 @@ def change_requests():
             return redirect(url_for("manager.change_requests"))
 
         if action == "approve":
-            # Update the shift
+            new_code = req["requested_shift"]
+            start_t, end_t = SHIFT_TIMINGS.get(new_code, ("09:00", "17:00"))
+
             mongo.db.shifts.update_one(
                 {"date": req["date"], "user_id": req["user_id"]},
                 {
                     "$set": {
-                        "shift_code": req["requested_shift"],
+                        "shift_code": new_code,
+                        "start_time": start_t,
+                        "end_time": end_t,
                         "updated_at": datetime.utcnow(),
                     }
                 },
             )
 
-            # Update request status
             mongo.db.shift_change_requests.update_one(
                 {"_id": ObjectId(req_id)},
                 {"$set": {"status": "approved", "updated_at": datetime.utcnow()}},
             )
 
-            # Notify user
             mongo.db.notifications.insert_one(
                 {
                     "user_id": req["user_id"],
@@ -830,13 +1095,12 @@ def change_requests():
             )
 
             flash("Request approved and shift updated.", "success")
+
         elif action == "reject":
             mongo.db.shift_change_requests.update_one(
                 {"_id": ObjectId(req_id)},
                 {"$set": {"status": "rejected", "updated_at": datetime.utcnow()}},
             )
-
-            # Notify user
             mongo.db.notifications.insert_one(
                 {
                     "user_id": req["user_id"],
@@ -845,12 +1109,13 @@ def change_requests():
                     "read": False,
                 }
             )
-
             flash("Request rejected.", "info")
 
         return redirect(url_for("manager.change_requests"))
 
-    requests = list(mongo.db.shift_change_requests.find().sort("created_at", -1))
+    requests = list(
+        mongo.db.shift_change_requests.find().sort("created_at", -1)
+    )
     users_map = {str(u["_id"]): u["name"] for u in mongo.db.users.find()}
 
     return render_template(
@@ -860,7 +1125,10 @@ def change_requests():
     )
 
 
-@manager_bp.route("/swap-requests", methods=["GET", "POST"])
+# =========================================================
+# SWAP REQUESTS
+# =========================================================
+@manager_bp.route("/swap-requests", methods=["GET", "POST"], endpoint="swap_requests")
 @manager_required
 def swap_requests():
     if request.method == "POST":
@@ -888,11 +1156,16 @@ def swap_requests():
                 requester_shift_code = requester_shift.get("shift_code")
                 target_shift_code = target_shift.get("shift_code")
 
+                t_start, t_end = SHIFT_TIMINGS.get(target_shift_code, ("09:00", "17:00"))
+                r_start, r_end = SHIFT_TIMINGS.get(requester_shift_code, ("09:00", "17:00"))
+
                 mongo.db.shifts.update_one(
                     {"_id": requester_shift["_id"]},
                     {
                         "$set": {
                             "shift_code": target_shift_code,
+                            "start_time": t_start,
+                            "end_time": t_end,
                             "updated_at": datetime.utcnow(),
                         }
                     },
@@ -902,6 +1175,8 @@ def swap_requests():
                     {
                         "$set": {
                             "shift_code": requester_shift_code,
+                            "start_time": r_start,
+                            "end_time": r_end,
                             "updated_at": datetime.utcnow(),
                         }
                     },
@@ -930,12 +1205,12 @@ def swap_requests():
             )
 
             flash("Request approved and shifts swapped.", "success")
+
         elif action == "reject":
             mongo.db.shift_swap_requests.update_one(
                 {"_id": ObjectId(req_id)},
                 {"$set": {"status": "rejected", "updated_at": datetime.utcnow()}},
             )
-
             mongo.db.notifications.insert_one(
                 {
                     "user_id": req["requester_id"],
@@ -944,7 +1219,6 @@ def swap_requests():
                     "read": False,
                 }
             )
-
             flash("Request rejected.", "info")
 
         return redirect(url_for("manager.swap_requests"))
@@ -957,3 +1231,41 @@ def swap_requests():
         requests=requests,
         users_map=users_map,
     )
+
+
+# =========================================================
+# MANAGER PROFILE (PROFILE PICTURE UPLOAD)
+# =========================================================
+# ---------------------------------------------------------
+# MANAGER PROFILE PAGE (UPLOAD PROFILE PICTURE)
+# ---------------------------------------------------------
+@manager_bp.route("/profile", methods=["GET", "POST"], endpoint="profile")
+@manager_required
+def profile():
+    user_id = ObjectId(session["user_id"])
+    user = mongo.db.users.find_one({"_id": user_id})
+    
+    if not user:
+        flash("User not found.", "danger")
+        return redirect("/manager/dashboard")
+
+    if request.method == "POST":
+        file = request.files.get("profile_picture")
+
+        if file and allowed_file(file.filename):
+            filename = secure_filename(f"{user_id}.jpg")
+            filepath = os.path.join(current_app.config["UPLOAD_FOLDER"], filename)
+            file.save(filepath)
+
+            mongo.db.users.update_one(
+                {"_id": user_id},
+                {"$set": {"profile_picture": filename}}
+            )
+
+            flash("Profile picture updated!", "success")
+            return redirect("/manager/profile")
+
+        flash("Invalid image file type.", "danger")
+
+    profile_pic = user.get("profile_picture", "default.png") if user else "default.png"
+    return render_template("manager/profile.html", user=user, profile_pic=profile_pic)

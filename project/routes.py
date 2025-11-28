@@ -6,7 +6,7 @@ from bson.objectid import ObjectId
 from datetime import datetime
 from extensions import mongo
 
-project_bp = Blueprint("project", __name__, url_prefix="/project")
+project_bp = Blueprint("project", __name__)
 
 
 def manager_required(f):
@@ -16,7 +16,7 @@ def manager_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session or session.get("role") != "manager":
             flash("Manager access required.", "danger")
-            return redirect(url_for("auth.login"))
+            return redirect("/login")
         return f(*args, **kwargs)
 
     return decorated
@@ -29,16 +29,25 @@ def login_required(f):
     def decorated(*args, **kwargs):
         if "user_id" not in session:
             flash("Please login first.", "warning")
-            return redirect(url_for("auth.login"))
+            return redirect("/login")
         return f(*args, **kwargs)
 
     return decorated
 
 
+# SAME SHIFT TIMINGS AS MANAGER
+SHIFT_TIMINGS = {
+    "A": ("06:00", "14:30"),  # 6 AM → 2:30 PM
+    "B": ("14:00", "22:30"),  # 2 PM → 10:30 PM
+    "C": ("22:00", "06:00"),  # 10 PM → 6 AM next day
+    "G": ("09:00", "17:30"),  # 9 AM → 5:30 PM
+}
+
+
 # -----------------------------------------
 # LIST ALL PROJECTS
 # -----------------------------------------
-@project_bp.route("/")
+@project_bp.route("/", endpoint="list_projects")
 @manager_required
 def list_projects():
     projects = mongo.db.projects.find().sort("created_at", -1)
@@ -49,7 +58,7 @@ def list_projects():
 # -----------------------------------------
 # CREATE NEW PROJECT
 # -----------------------------------------
-@project_bp.route("/create", methods=["GET", "POST"])
+@project_bp.route("/create", methods=["GET", "POST"], endpoint="create_project")
 @manager_required
 def create_project():
     if request.method == "POST":
@@ -75,7 +84,7 @@ def create_project():
 # -----------------------------------------
 # VIEW PROJECT
 # -----------------------------------------
-@project_bp.route("/view/<project_id>")
+@project_bp.route("/view/<project_id>", endpoint="view_project")
 @login_required
 def view_project(project_id):
     project = mongo.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -85,13 +94,9 @@ def view_project(project_id):
             return redirect(url_for("project.list_projects"))
         return redirect(url_for("member.dashboard"))
     
-    # Get tasks for this project
     tasks = list(mongo.db.project_tasks.find({"project_id": ObjectId(project_id)}))
-    
-    # Get shifts for this project
     shifts = list(mongo.db.shifts.find({"project_id": ObjectId(project_id)}).sort("date", 1))
     
-    # Create users map
     users_map = {str(u["_id"]): u["name"] for u in mongo.db.users.find()}
     
     is_manager = session.get("role") == "manager"
@@ -109,7 +114,7 @@ def view_project(project_id):
 # -----------------------------------------
 # EDIT PROJECT
 # -----------------------------------------
-@project_bp.route("/edit/<project_id>", methods=["GET", "POST"])
+@project_bp.route("/edit/<project_id>", methods=["GET", "POST"], endpoint="edit_project")
 @manager_required
 def edit_project(project_id):
     project = mongo.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -145,7 +150,7 @@ def edit_project(project_id):
 # -----------------------------------------
 # ADD TASK TO PROJECT
 # -----------------------------------------
-@project_bp.route("/add-task/<project_id>", methods=["GET", "POST"])
+@project_bp.route("/add-task/<project_id>", methods=["GET", "POST"], endpoint="add_task")
 @manager_required
 def add_task(project_id):
     project = mongo.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -174,9 +179,9 @@ def add_task(project_id):
 
 
 # -----------------------------------------
-# ADD SHIFT TO PROJECT
+# ADD SHIFT TO PROJECT (AUTO TIME)
 # -----------------------------------------
-@project_bp.route("/add-shift/<project_id>", methods=["GET", "POST"])
+@project_bp.route("/add-shift/<project_id>", methods=["GET", "POST"], endpoint="add_shift")
 @manager_required
 def add_shift(project_id):
     project = mongo.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -188,9 +193,15 @@ def add_shift(project_id):
         date_str = request.form.get("date")
         user_id = request.form.get("user_id")
         shift_code = request.form.get("shift_code")
-        start_time = request.form.get("start_time") or "09:00"
-        end_time = request.form.get("end_time") or "17:00"
         task = request.form.get("task") or ""
+
+        if not date_str or not user_id or not shift_code:
+            flash("Please fill all required fields.", "danger")
+            users = list(mongo.db.users.find({"role": "member"}))
+            return render_template("project/add_shift.html", project=project, users=users)
+
+        # AUTO TIME from shift code
+        start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("09:00", "17:00"))
         
         # Check for shift conflict
         existing_shift = mongo.db.shifts.find_one({
@@ -201,7 +212,11 @@ def add_shift(project_id):
         if existing_shift:
             user = mongo.db.users.find_one({"_id": ObjectId(user_id)})
             user_name = user["name"] if user else "Unknown"
-            flash(f"Conflict: {user_name} already has a shift on {date_str}. Please choose a different date or user.", "danger")
+            flash(
+                f"Conflict: {user_name} already has a shift on {date_str}. "
+                f"Please choose a different date or user.",
+                "danger"
+            )
             users = list(mongo.db.users.find({"role": "member"}))
             return render_template("project/add_shift.html", project=project, users=users)
         
@@ -228,7 +243,7 @@ def add_shift(project_id):
 # -----------------------------------------
 # DELETE PROJECT
 # -----------------------------------------
-@project_bp.route("/delete/<project_id>", methods=["POST"])
+@project_bp.route("/delete/<project_id>", methods=["POST"], endpoint="delete_project")
 @manager_required
 def delete_project(project_id):
     project = mongo.db.projects.find_one({"_id": ObjectId(project_id)})
@@ -236,16 +251,13 @@ def delete_project(project_id):
         flash("Project not found.", "danger")
         return redirect(url_for("project.list_projects"))
     
-    # Delete related tasks
     mongo.db.project_tasks.delete_many({"project_id": ObjectId(project_id)})
     
-    # Remove project_id from related shifts (don't delete shifts, just unlink them)
     mongo.db.shifts.update_many(
         {"project_id": ObjectId(project_id)},
         {"$set": {"project_id": None}}
     )
     
-    # Delete the project
     mongo.db.projects.delete_one({"_id": ObjectId(project_id)})
     
     flash(f"Project '{project['name']}' deleted successfully!", "success")

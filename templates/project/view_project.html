@@ -1,73 +1,111 @@
 {% extends "base.html" %}
 {% block content %}
-<div class="d-flex justify-content-between align-items-center mb-3">
-  <div>
-    <h3>{{ project.name }}</h3>
-    <p class="mb-1">{{ project.description }}</p>
-    <p class="text-muted mb-0">
-      <strong>Project Duration:</strong> 
-      {% if project.start_date and project.end_date %}
-        {{ project.start_date }} to {{ project.end_date }}
-      {% else %}
-        Not set
-      {% endif %}
-    </p>
-  </div>
+
+<h3 class="mb-3">
+  Project: {{ project.name }}
+</h3>
+<p class="text-muted">
+  {{ project.description or "No description provided." }}
+</p>
+
+<div class="mb-3">
+  <a href="{{ url_for('project.list_projects') }}" class="btn btn-outline-secondary btn-sm">
+    ← Back to Projects
+  </a>
   {% if is_manager %}
-  <div class="d-flex gap-2">
-    <a href="{{ url_for('project.edit_project', project_id=project._id) }}" class="btn btn-primary"><i class="fas fa-edit me-2"></i>Edit Project</a>
-    <form method="post" action="{{ url_for('project.delete_project', project_id=project._id) }}" class="d-inline" onsubmit="return confirm('Are you sure you want to delete this project? This will also delete all associated tasks and unlink shifts. This action cannot be undone.');">
-      <button type="submit" class="btn btn-danger"><i class="fas fa-trash me-2"></i>Delete Project</button>
-    </form>
-  </div>
+  <a href="{{ url_for('project.edit_project', project_id=project._id) }}"
+     class="btn btn-sm btn-primary ms-2">
+    Edit Project
+  </a>
+  <a href="{{ url_for('project.add_task', project_id=project._id) }}"
+     class="btn btn-sm btn-success ms-2">
+    Add Task
+  </a>
+  <a href="{{ url_for('project.add_shift', project_id=project._id) }}"
+     class="btn btn-sm btn-info ms-2">
+    Add Shift
+  </a>
   {% endif %}
 </div>
 
-<hr>
+<div class="row g-4">
+  <!-- TASKS -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <strong>Tasks</strong>
+      </div>
+      <div class="card-body p-0">
+        {% if tasks %}
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Task</th>
+                <th>Assigned To</th>
+                <th>Due Date</th>
+                <th>Created</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for t in tasks %}
+              <tr>
+                <td>{{ t.task_name }}</td>
+                <td>{{ users_map[t.assigned_to|string] if t.assigned_to else "-" }}</td>
+                <td>{{ t.due_date or "-" }}</td>
+                <td>{{ t.created_at.strftime('%Y-%m-%d') if t.created_at else "-" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No tasks yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
 
-{% if is_manager %}
-<a href="{{ url_for('project.add_task', project_id=project._id) }}" class="btn btn-secondary">Add Task</a>
-<a href="{{ url_for('project.add_shift', project_id=project._id) }}" class="btn btn-warning">Add Shift</a>
-{% endif %}
-
-<h4 class="mt-4">Tasks</h4>
-<table class="table table-sm">
-  <tr>
-    <th>Task</th>
-    <th>Assigned To</th>
-    <th>Due</th>
-  </tr>
-  {% for t in tasks %}
-  <tr>
-    <td>{{ t.task_name }}</td>
-    <td>{{ users_map[t.assigned_to|string] }}</td>
-    <td>{{ t.due_date }}</td>
-  </tr>
-  {% else %}
-  <tr><td colspan="3" class="text-center">No tasks yet.</td></tr>
-  {% endfor %}
-</table>
-
-<h4 class="mt-4">Shifts</h4>
-<table class="table table-sm">
-  <tr>
-    <th>Date</th>
-    <th>User</th>
-    <th>Shift</th>
-    <th>Time</th>
-    <th>Task</th>
-  </tr>
-  {% for s in shifts %}
-  <tr>
-    <td>{{ s.date }}</td>
-    <td>{{ users_map[s.user_id|string] }}</td>
-    <td><span class="badge shift-badge-{{ s.shift_code }}">{{ s.shift_code }}</span></td>
-    <td>{{ s.start_time }} - {{ s.end_time }}</td>
-    <td>{{ s.task }}</td>
-  </tr>
-  {% else %}
-  <tr><td colspan="5" class="text-center">No shifts yet.</td></tr>
-  {% endfor %}
-</table>
+  <!-- SHIFTS -->
+  <div class="col-md-6">
+    <div class="card shadow-sm">
+      <div class="card-header bg-light">
+        <strong>Shifts</strong>
+      </div>
+      <div class="card-body p-0">
+        {% if shifts %}
+        <div class="table-responsive">
+          <table class="table mb-0">
+            <thead class="table-light">
+              <tr>
+                <th>Date</th>
+                <th>Member</th>
+                <th>Shift</th>
+                <th>Start</th>
+                <th>End</th>
+                <th>Task</th>
+              </tr>
+            </thead>
+            <tbody>
+              {% for s in shifts %}
+              <tr>
+                <td>{{ s.date }}</td>
+                <td>{{ users_map[s.user_id|string] if s.user_id else "-" }}</td>
+                <td><span class="badge bg-primary">{{ s.shift_code }}</span></td>
+                <td>{{ s.start_time }}</td>
+                <td>{{ s.end_time }}</td>
+                <td>{{ s.task or "-" }}</td>
+              </tr>
+              {% endfor %}
+            </tbody>
+          </table>
+        </div>
+        {% else %}
+        <p class="text-muted p-3 mb-0">No shifts added yet.</p>
+        {% endif %}
+      </div>
+    </div>
+  </div>
+</div>
 
 {% endblock %}

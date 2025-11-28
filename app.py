@@ -4,8 +4,8 @@ from config import Config
 from extensions import mongo
 
 from auth.routes import auth_bp
-from manager.routes import manager_bp
-from member.routes import member_bp
+from manager import manager_bp
+from member import member_bp
 from project.routes import project_bp
 
 # Load environment variables from .env file
@@ -15,6 +15,11 @@ load_dotenv()
 def create_app():
     app = Flask(__name__)
     app.config.from_object(Config)
+
+    # Ensure upload folder exists
+    import os
+    upload_folder = app.config.get("UPLOAD_FOLDER", "static/uploads/profile_pics")
+    os.makedirs(upload_folder, exist_ok=True)
 
     mongo.init_app(app)
 
@@ -28,9 +33,9 @@ def create_app():
     def index():
         if "user_id" in session:
             if session.get("role") == "manager":
-                return redirect(url_for("manager.dashboard"))
+                return redirect("/manager/dashboard")
             else:
-                return redirect(url_for("member.dashboard"))
+                return redirect("/member/dashboard")
         return render_template("index.html")
 
     return app

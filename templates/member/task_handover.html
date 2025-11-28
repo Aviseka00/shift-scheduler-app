@@ -1,0 +1,143 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade-in-up">
+  <h2 class="mb-4" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+    📋 Task Handover
+  </h2>
+  <p class="text-muted mb-4">Write tasks completed and tasks for next shift members. All team members from the same project can view these handovers.</p>
+
+  <!-- FILTERS -->
+  <div class="glass-card p-4 mb-4">
+    <form method="get" class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Project</label>
+        <select name="project_id" class="form-select" onchange="this.form.submit()">
+          <option value="">Select Project</option>
+          {% for p in projects %}
+          <option value="{{ p._id }}" {% if selected_project and selected_project|string == p._id|string %}selected{% endif %}>
+            {{ p.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Date</label>
+        <input type="date" name="date" class="form-control" value="{{ selected_date }}" onchange="this.form.submit()">
+      </div>
+    </form>
+  </div>
+
+  {% if not projects %}
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    <strong>No Projects Assigned:</strong> You are not assigned to any projects. Please contact your manager.
+  </div>
+  {% elif not selected_project %}
+  <div class="alert alert-info">
+    Please select a project to view and post task handovers.
+  </div>
+  {% else %}
+  
+  <!-- EXISTING TASK ENTRIES -->
+  {% if task_entries %}
+  <div class="glass-card p-4 mb-4">
+    <h5 class="mb-3">Task Handovers for {{ selected_date }}</h5>
+    <div class="row g-3">
+      {% for entry in task_entries %}
+      <div class="col-12">
+        <div class="card shadow-sm">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <strong class="text-primary">Shift {{ entry.shift_code }}</strong>
+                <span class="text-muted ms-2">• By {{ entry.author.name if entry.author else 'Unknown' }}</span>
+                <span class="badge bg-info ms-2">{{ entry.date }}</span>
+              </div>
+              <small class="text-muted">
+                {% if entry.created_at %}
+                  {% if entry.created_at.strftime %}
+                    {{ entry.created_at.strftime('%Y-%m-%d %H:%M') }}
+                  {% else %}
+                    {{ entry.created_at }}
+                  {% endif %}
+                {% endif %}
+              </small>
+            </div>
+            {% if entry.works_completed %}
+            <div class="mb-2">
+              <strong class="text-success">✓ Tasks Completed:</strong>
+              <p class="mb-0">{{ entry.works_completed }}</p>
+            </div>
+            {% endif %}
+            {% if entry.works_to_do %}
+            <div>
+              <strong class="text-warning">→ Tasks For Next Shift:</strong>
+              <p class="mb-0">{{ entry.works_to_do }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% else %}
+  <div class="alert alert-info mb-4">
+    No task handovers found for this date. Be the first to post one!
+  </div>
+  {% endif %}
+
+  <!-- POST TASK HANDOVER FORM -->
+  <div class="glass-card p-4">
+    <h5 class="mb-3">Post Task Handover</h5>
+    <form method="post">
+      <input type="hidden" name="project_id" value="{{ selected_project }}">
+      
+      <div class="row g-3 mb-3">
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Date *</label>
+          <input type="date" name="date" class="form-control" value="{{ selected_date }}" required>
+        </div>
+        
+        <div class="col-md-4">
+          <label class="form-label fw-semibold">Shift *</label>
+          <select name="shift_code" class="form-select" required>
+            <option value="">-- Select Shift --</option>
+            <option value="A">A (06:00 – 14:30)</option>
+            <option value="B">B (14:00 – 22:30)</option>
+            <option value="C">C (22:00 – 06:00 next day)</option>
+            <option value="G">G (09:00 – 17:30)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Tasks Completed</label>
+        <textarea name="task_completed" class="form-control" rows="4" placeholder="Describe what tasks were completed during your shift..."></textarea>
+        <small class="text-muted">Optional but recommended</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Tasks For Next Shift Members</label>
+        <textarea name="task_to_do" class="form-control" rows="4" placeholder="Describe what tasks need to be done in the next shift..."></textarea>
+        <small class="text-muted">Optional but recommended</small>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Note:</strong> Fill in at least one field. All members from the same project can see your handover.
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-paper-plane me-2"></i>Post Handover
+      </button>
+    </form>
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}
+

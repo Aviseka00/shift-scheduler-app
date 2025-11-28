@@ -1,0 +1,91 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade-in-up">
+  <h2 class="mb-4" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+    📊 Upload Excel File for Bulk Shift Import
+  </h2>
+
+  <div class="glass-card p-4 mb-4">
+    <h5 class="mb-3">Instructions</h5>
+    <div class="alert alert-info">
+      <strong>Excel Format Requirements:</strong>
+      <ul class="mb-0 mt-2">
+        <li>First row must contain headers</li>
+        <li><strong>Required columns:</strong> Date, Member Name (or Name), Shift (A/B/C/G)</li>
+        <li><strong>Optional columns:</strong> Project, Task</li>
+        <li>Date format: YYYY-MM-DD or DD/MM/YYYY</li>
+        <li>Shift codes: A, B, C, or G</li>
+        <li>Member names must match existing member names or emails</li>
+      </ul>
+    </div>
+
+    <div class="alert alert-warning">
+      <strong>Note:</strong> If a shift already exists for a member on a date, it will be updated.
+    </div>
+  </div>
+
+  <div class="glass-card p-4 mb-4">
+    <h5 class="mb-3">Upload Excel File</h5>
+    <form method="post" enctype="multipart/form-data">
+      <div class="mb-3">
+        <label for="excel_file" class="form-label fw-semibold">Select Excel File (.xlsx or .xls)</label>
+        <input type="file" class="form-control" id="excel_file" name="excel_file" accept=".xlsx,.xls" required>
+      </div>
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-upload me-2"></i>Upload and Import
+      </button>
+      <a href="/manager/dashboard" class="btn btn-secondary ms-2">Cancel</a>
+    </form>
+  </div>
+
+  {% if errors %}
+  <div class="glass-card p-4">
+    <h5 class="mb-3 text-danger">Import Errors</h5>
+    <div class="alert alert-danger">
+      <ul class="mb-0">
+        {% for error in errors %}
+        <li>{{ error }}</li>
+        {% endfor %}
+      </ul>
+    </div>
+  </div>
+  {% endif %}
+
+  <div class="glass-card p-4 mt-4">
+    <h5 class="mb-3">Example Excel Format</h5>
+    <div class="table-responsive">
+      <table class="table table-bordered">
+        <thead>
+          <tr>
+            <th>Date</th>
+            <th>Member Name</th>
+            <th>Project</th>
+            <th>Shift</th>
+            <th>Task</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>2025-01-15</td>
+            <td>John Doe</td>
+            <td>Project Alpha</td>
+            <td>A</td>
+            <td>System Maintenance</td>
+          </tr>
+          <tr>
+            <td>2025-01-15</td>
+            <td>Jane Smith</td>
+            <td>Project Beta</td>
+            <td>B</td>
+            <td>Code Review</td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}
+

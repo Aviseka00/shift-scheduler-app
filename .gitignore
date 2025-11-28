@@ -15,8 +15,13 @@ build/
 .venv/
 venv/
 ENV/
+env/
 Lib/
 Scripts/
+*.pyc
+*.pyo
+*.pyd
+.Python
 
 # IDE
 .vscode/
@@ -30,4 +35,17 @@ Thumbs.db
 
 # Logs
 *.log
+
+# Uploads (keep folder structure but ignore files)
+static/uploads/profile_pics/*
+!static/uploads/profile_pics/.gitkeep
+
+# Documentation files (optional - remove if you want to keep them)
+IMPROVEMENTS_*.md
+SAFE_IMPROVEMENTS.md
+DEPLOYMENT*.md
+GITHUB_SETUP.md
+MONGODB_ATLAS_FIX.md
+PUSH_TO_GITHUB.md
+TESTING_GUIDE.md
 

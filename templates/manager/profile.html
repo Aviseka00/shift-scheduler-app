@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="col-md-6 mx-auto">
+
+  <div class="card shadow-sm">
+    <div class="card-body text-center">
+
+      <h3 class="mb-3">Manager Profile</h3>
+
+      <img src="/static/uploads/profile_pics/{{ profile_pic }}"
+           class="rounded-circle mb-3"
+           width="140" height="140" style="object-fit: cover;"
+           onerror="this.src='/static/uploads/profile_pics/default.png'">
+
+      <form method="post" enctype="multipart/form-data">
+        <input type="file" name="profile_picture" class="form-control mb-3" required>
+        <button class="btn btn-primary">Upload</button>
+      </form>
+
+    </div>
+  </div>
+
+</div>
+
+{% endblock %}

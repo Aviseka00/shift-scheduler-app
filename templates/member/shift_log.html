@@ -1,0 +1,146 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade-in-up">
+  <h2 class="mb-4" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+    📝 Shift Log Book
+  </h2>
+  <p class="text-muted mb-4">Fill in your shift log after completing your shift. This helps the next shift members understand what was done and what needs to be done.</p>
+
+  <!-- FILTERS -->
+  <div class="glass-card p-4 mb-4">
+    <form method="get" class="row g-3">
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Project</label>
+        <select name="project_id" class="form-select" onchange="this.form.submit()">
+          <option value="">Select Project</option>
+          {% for p in projects %}
+          <option value="{{ p._id }}" {% if selected_project and selected_project|string == p._id|string %}selected{% endif %}>
+            {{ p.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-4">
+        <label class="form-label fw-semibold">Date</label>
+        <input type="date" name="date" class="form-control" value="{{ selected_date }}" onchange="this.form.submit()">
+      </div>
+      <div class="col-md-4 d-flex align-items-end">
+        <a href="/member/view-shift-log?project_id={{ selected_project|default('') }}&date={{ selected_date|default('') }}" class="btn btn-outline-primary w-100">
+          📖 View All Logs
+        </a>
+      </div>
+    </form>
+  </div>
+
+  {% if not selected_project %}
+  <div class="alert alert-info">
+    Please select a project to view and fill shift logs.
+  </div>
+  {% elif not selected_date %}
+  <div class="alert alert-info">
+    Please select a date to view shift logs.
+  </div>
+  {% else %}
+  
+  <!-- EXISTING LOG ENTRIES -->
+  {% if log_entries %}
+  <div class="glass-card p-4 mb-4">
+    <h5 class="mb-3">Existing Log Entries for {{ selected_date }}</h5>
+    <div class="row g-3">
+      {% for entry in log_entries %}
+      <div class="col-12">
+        <div class="card">
+          <div class="card-body">
+            <div class="d-flex justify-content-between align-items-start mb-2">
+              <div>
+                <strong>Shift {{ entry.shift.shift_code if entry.shift else 'N/A' }}</strong>
+                <span class="text-muted ms-2">• {{ entry.user.name if entry.user else 'Unknown' }}</span>
+                {% if entry.shift %}
+                <span class="badge bg-secondary ms-2">{{ entry.shift.start_time }} - {{ entry.shift.end_time }}</span>
+                {% endif %}
+              </div>
+              <small class="text-muted">
+                {% if entry.created_at %}
+                  {% if entry.created_at.strftime %}
+                    {{ entry.created_at.strftime('%Y-%m-%d %H:%M') }}
+                  {% else %}
+                    {{ entry.created_at }}
+                  {% endif %}
+                {% endif %}
+              </small>
+            </div>
+            {% if entry.works_completed %}
+            <div class="mb-2">
+              <strong class="text-success">✓ Works Completed:</strong>
+              <p class="mb-0">{{ entry.works_completed }}</p>
+            </div>
+            {% endif %}
+            {% if entry.works_to_do %}
+            <div>
+              <strong class="text-warning">→ Works To Do:</strong>
+              <p class="mb-0">{{ entry.works_to_do }}</p>
+            </div>
+            {% endif %}
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endif %}
+
+  <!-- FILL LOG FORM -->
+  <div class="glass-card p-4">
+    <h5 class="mb-3">Fill Shift Log</h5>
+    <form method="post">
+      <input type="hidden" name="project_id" value="{{ selected_project|default('') }}">
+      <input type="hidden" name="date" value="{{ selected_date|default('') }}">
+      
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Select Your Shift</label>
+        <select name="shift_id" class="form-select" required>
+          <option value="">-- Select Shift --</option>
+          {% for shift in available_shifts %}
+          <option value="{{ shift._id }}">
+            Shift {{ shift.shift_code }} ({{ shift.start_time }} - {{ shift.end_time }})
+          </option>
+          {% endfor %}
+        </select>
+        <small class="text-muted">Select the shift you completed</small>
+        {% if not available_shifts %}
+        <div class="alert alert-warning mt-2 mb-0">
+          No shifts found for you on this date. Please check if you have a shift scheduled.
+        </div>
+        {% endif %}
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Works Completed</label>
+        <textarea name="works_completed" class="form-control" rows="4" placeholder="Describe what work was completed during your shift..."></textarea>
+        <small class="text-muted">This field is optional but recommended</small>
+      </div>
+
+      <div class="mb-3">
+        <label class="form-label fw-semibold">Works To Be Done (Next Shift)</label>
+        <textarea name="works_to_do" class="form-control" rows="4" placeholder="Describe what work needs to be done in the next shift..."></textarea>
+        <small class="text-muted">This field is optional but recommended</small>
+      </div>
+
+      <div class="alert alert-info">
+        <i class="fas fa-info-circle me-2"></i>
+        <strong>Note:</strong> At least one field (Works Completed or Works To Be Done) should be filled.
+      </div>
+
+      <button type="submit" class="btn btn-primary">
+        <i class="fas fa-save me-2"></i>Save Log Entry
+      </button>
+    </form>
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}
+

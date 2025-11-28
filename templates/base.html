@@ -29,7 +29,7 @@
 
 <nav class="navbar navbar-expand-lg navbar-dark mb-4">
   <div class="container-fluid">
-    <a class="navbar-brand fw-bold" href="{{ url_for('index') }}">
+    <a class="navbar-brand fw-bold" href="/">
       <i class="fas fa-calendar-alt me-2"></i>Shift Planner
     </a>
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
@@ -38,30 +38,45 @@
     <div class="collapse navbar-collapse" id="navbarNav">
       <ul class="navbar-nav me-auto">
         {% if session.get('role') == 'manager' %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.dashboard') }}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.manage_shifts') }}">Manage Shifts</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.team_view') }}">Team Row View</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.change_requests') }}">Change Requests</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('manager.swap_requests') }}">Swap Requests</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('project.list_projects') }}">Projects</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/dashboard">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/manage-shifts">Manage Shifts</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/change-requests">Change Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/swap-requests">Swap Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="/project/">Projects</a></li>
         {% elif session.get('role') == 'member' %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.dashboard') }}">Dashboard</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.my_schedule') }}">My Schedule</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.request_shift_change') }}">Request Change</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('member.request_swap') }}">Request Swap</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/dashboard">Dashboard</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/my-schedule">My Schedule</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/request-change">Request Change</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/request-swap">Request Swap</a></li>
         {% endif %}
       </ul>
       <ul class="navbar-nav">
         {% if session.get('user_id') %}
           <li class="nav-item">
-            <span class="navbar-text text-white me-3">
-              <i class="fas fa-user-circle me-2"></i>{{ session.get('name') }} <span class="badge" style="background: rgba(255,255,255,0.2);">{{ session.get('role')|title }}</span>
+            <span class="navbar-text text-white d-flex align-items-center">
+              <i class="fas fa-user-circle me-2"></i>
+              {{ session.get('name') }}
+              <span class="badge ms-2" style="background: rgba(255,255,255,0.2);">
+                {{ session.get('role')|title }}
+              </span>
             </span>
           </li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.logout') }}"><i class="fas fa-sign-out-alt me-2"></i>Logout</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="/logout">
+              <i class="fas fa-sign-out-alt me-2"></i>Logout
+            </a>
+          </li>
         {% else %}
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.login') }}"><i class="fas fa-sign-in-alt me-2"></i>Login</a></li>
-          <li class="nav-item"><a class="nav-link" href="{{ url_for('auth.register') }}"><i class="fas fa-user-plus me-2"></i>Register</a></li>
+          <li class="nav-item">
+            <a class="nav-link" href="/login">
+              <i class="fas fa-sign-in-alt me-2"></i>Login
+            </a>
+          </li>
+          <li class="nav-item">
+            <a class="nav-link" href="/register">
+              <i class="fas fa-user-plus me-2"></i>Register
+            </a>
+          </li>
         {% endif %}
       </ul>
     </div>
@@ -98,6 +113,125 @@
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
+<script>
+// Auto-dismiss flash messages
+document.addEventListener('DOMContentLoaded', function() {
+  const alerts = document.querySelectorAll('.alert');
+  alerts.forEach(function(alert) {
+    const category = alert.classList.contains('alert-success') ? 'success' :
+                     alert.classList.contains('alert-info') ? 'info' :
+                     alert.classList.contains('alert-warning') ? 'warning' : 'danger';
+    
+    // Auto-dismiss success messages after 5 seconds
+    if (category === 'success') {
+      setTimeout(function() {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      }, 5000);
+    }
+    // Auto-dismiss info messages after 7 seconds
+    else if (category === 'info') {
+      setTimeout(function() {
+        const bsAlert = new bootstrap.Alert(alert);
+        bsAlert.close();
+      }, 7000);
+    }
+    // Keep danger and warning messages until manually dismissed
+  });
+
+  // Client-side form validation
+  const forms = document.querySelectorAll('form[method="post"]');
+  forms.forEach(function(form) {
+    form.addEventListener('submit', function(e) {
+      let isValid = true;
+      const requiredFields = form.querySelectorAll('[required]');
+      const errorMessages = [];
+
+      // Clear previous error messages
+      form.querySelectorAll('.invalid-feedback').forEach(function(el) {
+        el.remove();
+      });
+      form.querySelectorAll('.is-invalid').forEach(function(el) {
+        el.classList.remove('is-invalid');
+      });
+
+      requiredFields.forEach(function(field) {
+        const value = field.value.trim();
+        
+        // Check if field is empty
+        if (!value) {
+          isValid = false;
+          field.classList.add('is-invalid');
+          const feedback = document.createElement('div');
+          feedback.className = 'invalid-feedback';
+          feedback.textContent = 'This field is required.';
+          field.parentNode.appendChild(feedback);
+        }
+        
+        // Validate date fields (prevent past dates for shift creation)
+        if (field.type === 'date' && value) {
+          const selectedDate = new Date(value);
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          
+          // For shift creation forms, prevent past dates
+          if (form.querySelector('input[name="date"]') && selectedDate < today) {
+            isValid = false;
+            field.classList.add('is-invalid');
+            const feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            feedback.textContent = 'Cannot select a past date.';
+            field.parentNode.appendChild(feedback);
+          }
+        }
+        
+        // Validate email fields
+        if (field.type === 'email' && value) {
+          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+          if (!emailRegex.test(value)) {
+            isValid = false;
+            field.classList.add('is-invalid');
+            const feedback = document.createElement('div');
+            feedback.className = 'invalid-feedback';
+            feedback.textContent = 'Please enter a valid email address.';
+            field.parentNode.appendChild(feedback);
+          }
+        }
+      });
+
+      if (!isValid) {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        // Show error message at top of form
+        let errorAlert = form.querySelector('.form-validation-error');
+        if (!errorAlert) {
+          errorAlert = document.createElement('div');
+          errorAlert.className = 'alert alert-danger form-validation-error mb-3';
+          errorAlert.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Please fix the errors below before submitting.';
+          form.insertBefore(errorAlert, form.firstChild);
+        }
+        
+        // Scroll to first error
+        const firstError = form.querySelector('.is-invalid');
+        if (firstError) {
+          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          firstError.focus();
+        }
+      } else {
+        // Disable submit button to prevent double submission
+        const submitBtn = form.querySelector('button[type="submit"]');
+        if (submitBtn) {
+          submitBtn.disabled = true;
+          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
+        }
+      }
+    });
+  });
+});
+</script>
+
 {% block scripts %}{% endblock %}
+
 </body>
 </html>

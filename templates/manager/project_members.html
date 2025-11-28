@@ -1,0 +1,152 @@
+{% extends "base.html" %}
+{% block content %}
+
+<div class="animate-fade-in-up">
+  <h2 class="mb-4" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
+    👥 Project Members & Allocations
+  </h2>
+  <p class="text-muted mb-4">View project-wise member allocations, their shifts, and assigned tasks.</p>
+
+  <!-- FILTERS -->
+  <div class="glass-card p-4 mb-4">
+    <form method="get" class="row g-3">
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Select Project</label>
+        <select name="project_id" class="form-select" onchange="this.form.submit()">
+          <option value="">-- Select Project --</option>
+          {% for p in projects %}
+          <option value="{{ p._id }}"
+            {% if selected_project and selected_project == p._id %}selected{% endif %}>
+            {{ p.name }}
+          </option>
+          {% endfor %}
+        </select>
+      </div>
+      <div class="col-md-6">
+        <label class="form-label fw-semibold">Week Starting Date</label>
+        <input type="date" name="date" class="form-control" value="{{ selected_date }}" onchange="this.form.submit()">
+      </div>
+    </form>
+  </div>
+
+  {% if not selected_project %}
+  <div class="alert alert-info">
+    <i class="fas fa-info-circle me-2"></i>
+    Please select a project to view member allocations, shifts, and tasks.
+  </div>
+  {% elif not members_data %}
+  <div class="alert alert-warning">
+    <i class="fas fa-exclamation-triangle me-2"></i>
+    No members allocated to this project yet. Assign members to this project to see their shifts and tasks.
+  </div>
+  {% else %}
+  
+  <!-- MEMBERS LIST -->
+  <div class="row g-4">
+    {% for data in members_data %}
+    <div class="col-12">
+      <div class="card shadow-sm">
+        <div class="card-header bg-primary text-white">
+          <div class="d-flex justify-content-between align-items-center">
+            <div>
+              <h5 class="mb-0">
+                <i class="fas fa-user me-2"></i>{{ data.member.name }}
+              </h5>
+              <small>{{ data.member.email }}</small>
+            </div>
+            <div class="text-end">
+              <span class="badge bg-light text-dark me-2">{{ data.shift_count }} Shifts</span>
+              <span class="badge bg-light text-dark">{{ data.task_count }} Tasks</span>
+            </div>
+          </div>
+        </div>
+        <div class="card-body">
+          <div class="row">
+            <!-- SHIFTS SECTION -->
+            <div class="col-md-6">
+              <h6 class="mb-3">
+                <i class="fas fa-calendar-alt me-2 text-primary"></i>Shifts
+              </h6>
+              {% if data.shifts %}
+              <div class="table-responsive">
+                <table class="table table-sm table-hover">
+                  <thead>
+                    <tr>
+                      <th>Date</th>
+                      <th>Shift</th>
+                      <th>Time</th>
+                      <th>Task</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {% for shift in data.shifts %}
+                    <tr>
+                      <td>{{ shift.date }}</td>
+                      <td>
+                        <span class="badge 
+                          {% if shift.shift_code == 'A' %}bg-primary
+                          {% elif shift.shift_code == 'B' %}bg-success
+                          {% elif shift.shift_code == 'C' %}bg-warning text-dark
+                          {% elif shift.shift_code == 'G' %}bg-info
+                          {% else %}bg-secondary{% endif %}">
+                          {{ shift.shift_code }}
+                        </span>
+                      </td>
+                      <td>{{ shift.start_time }} - {{ shift.end_time }}</td>
+                      <td>
+                        <small class="text-muted">{{ shift.task or 'N/A' }}</small>
+                      </td>
+                    </tr>
+                    {% endfor %}
+                  </tbody>
+                </table>
+              </div>
+              {% else %}
+              <p class="text-muted mb-0">
+                <i class="fas fa-info-circle me-2"></i>No shifts assigned for this week.
+              </p>
+              {% endif %}
+            </div>
+
+            <!-- TASKS SECTION -->
+            <div class="col-md-6">
+              <h6 class="mb-3">
+                <i class="fas fa-tasks me-2 text-success"></i>Tasks
+              </h6>
+              {% if data.tasks %}
+              <div class="list-group">
+                {% for task in data.tasks %}
+                <div class="list-group-item">
+                  <div class="d-flex justify-content-between align-items-start">
+                    <div>
+                      <h6 class="mb-1">{{ task.task_name or task.name or 'Unnamed Task' }}</h6>
+                      <p class="mb-1 text-muted small">{{ task.description or 'No description' }}</p>
+                      {% if task.due_date %}
+                      <small class="text-muted">
+                        Due: {{ task.due_date }}
+                      </small>
+                      {% endif %}
+                    </div>
+                  </div>
+                </div>
+                {% endfor %}
+              </div>
+              {% else %}
+              <p class="text-muted mb-0">
+                <i class="fas fa-info-circle me-2"></i>No tasks assigned.
+              </p>
+              {% endif %}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+
+  {% endif %}
+
+</div>
+
+{% endblock %}
+

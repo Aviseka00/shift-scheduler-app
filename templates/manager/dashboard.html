@@ -44,19 +44,19 @@
       <p class="text-muted mb-0 small">Visualize and manage all team shifts</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
-      <a href="{{ url_for('manager.export_csv') }}" class="btn btn-sm btn-outline-success">
+      <a href="/manager/export/csv" class="btn btn-sm btn-outline-success">
         📊 Export CSV
       </a>
-      <a href="{{ url_for('manager.export_print') }}" target="_blank" class="btn btn-sm btn-outline-secondary">
-        🖨️ Print PDF
+      <a href="/manager/export/print" target="_blank" class="btn btn-sm btn-outline-secondary">
+🖨️ Print PDF
       </a>
-      <a href="{{ url_for('project.create_project') }}" class="btn btn-sm btn-primary">
+      <a href="/project/create" class="btn btn-sm btn-primary">
         ➕ New Project
       </a>
     </div>
   </div>
 
-  <form class="row g-3 mb-4" method="post" action="{{ url_for('manager.auto_roster') }}">
+  <form class="row g-3 mb-4" method="post" action="/manager/auto-roster">
     <div class="col-md-3 col-6">
       <label class="form-label fw-semibold">Start Date</label>
       <input type="date" name="start_date" class="form-control" required>
@@ -127,7 +127,7 @@ document.addEventListener('DOMContentLoaded', function() {
   const calendarEl = document.getElementById('managerCalendar');
   const projectFilter = document.getElementById('projectFilter');
 
-  const editUrlTemplate = "{{ url_for('manager.edit_shift', shift_id='__ID__') }}";
+  const editUrlTemplate = "/manager/edit-shift/__ID__";
 
   function buildCalendar(initialView) {
     return new FullCalendar.Calendar(calendarEl, {
@@ -150,7 +150,7 @@ document.addEventListener('DOMContentLoaded', function() {
         if (projectId) {
           params.append('project_id', projectId);
         }
-        fetch("{{ url_for('manager.api_shifts') }}?" + params.toString())
+        fetch("/manager/api/shifts?" + params.toString())
           .then(response => response.json())
           .then(data => successCallback(data))
           .catch(err => failureCallback(err));
@@ -165,6 +165,25 @@ document.addEventListener('DOMContentLoaded', function() {
       eventDidMount: function(info) {
         if (info.event.extendedProps.tooltip) {
           info.el.title = info.event.extendedProps.tooltip;
+        }
+        // Add profile picture to event
+        const profilePic = info.event.extendedProps.profile_pic || 'default.png';
+        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
+        const img = document.createElement('img');
+        img.src = profilePicUrl;
+        img.style.width = '24px';
+        img.style.height = '24px';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        img.style.marginRight = '6px';
+        img.style.verticalAlign = 'middle';
+        img.onerror = function() {
+          this.src = '/static/uploads/profile_pics/default.png';
+        };
+        if (info.el.querySelector('.fc-event-title')) {
+          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
+        } else {
+          info.el.insertBefore(img, info.el.firstChild);
         }
       },
       eventDrop: function(info) {
@@ -185,7 +204,7 @@ document.addEventListener('DOMContentLoaded', function() {
   });
 
   function saveShiftMove(info) {
-    fetch("{{ url_for('manager.api_update_shift') }}", {
+    fetch("/manager/api/update-shift", {
       method: "POST",
       headers: {"Content-Type": "application/json"},
       body: JSON.stringify({

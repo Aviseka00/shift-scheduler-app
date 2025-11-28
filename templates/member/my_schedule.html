@@ -1,111 +1,217 @@
 {% extends "base.html" %}
-
 {% block content %}
-<h3 class="mb-3">My Schedule</h3>
 
-<div class="row">
-  <!-- Calendar -->
-  <div class="col-lg-9 mb-3">
-    <div id="myCalendar"
-         class="bg-white p-2 rounded shadow-sm"
-         style="min-height: 600px;"></div>
+{% set team_members = team_members or [] %}
+
+<div class="animate-fade-in-up">
+
+  <!-- MY PERSONAL CALENDAR -->
+  <h2 class="mb-1" style="font-weight: 700;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;">
+    My Schedule
+  </h2>
+  <p class="text-muted mb-4">
+    View your own shifts and your project team's weekly schedule.
+  </p>
+
+  <!-- My Shifts Calendar -->
+  <div class="glass-card p-4 mb-4">
+    <h5 class="mb-3" style="font-weight: 600; color: #667eea;">
+      <i class="fas fa-user-clock me-2"></i>My Shifts Calendar
+    </h5>
+    <div id="myCalendar"></div>
   </div>
 
-  <!-- Side Panel: Legend + Team Info -->
-  <div class="col-lg-3">
-    <!-- Legend -->
-    <div class="card mb-3 shadow-sm">
-      <div class="card-body">
-        <h6 class="fw-semibold mb-2">Legend</h6>
-        <ul class="list-unstyled small mb-0">
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#28a745;">&nbsp;</span>
-            <strong>Me</strong> – my own shifts & tasks
-          </li>
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#0d6efd;">&nbsp;</span>
-            <strong>Teammates</strong> – shifts of members in my project(s)
-          </li>
-          <li class="mt-2 mb-1"><strong>Shift Colors</strong></li>
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#0d6efd;">&nbsp;</span>
-            A Shift
-          </li>
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#198754;">&nbsp;</span>
-            B Shift
-          </li>
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#ffc107; color:#000;">&nbsp;</span>
-            C Shift
-          </li>
-          <li class="mb-1">
-            <span class="badge rounded-pill me-2" style="background-color:#6f42c1;">&nbsp;</span>
-            G / General Shift
-          </li>
-        </ul>
-      </div>
-    </div>
+  <!-- PROJECT TEAM ROW-WISE VIEW -->
+  <div class="glass-card p-4">
+    <div class="d-flex flex-wrap align-items-center justify-content-between mb-3">
+      <h5 class="mb-2" style="font-weight: 600; color: #667eea;">
+        <i class="fas fa-users me-2"></i>Project Team Schedules (Read-only)
+      </h5>
 
-    <!-- Projects -->
-    <div class="card mb-3 shadow-sm">
-      <div class="card-body">
-        <h6 class="fw-semibold mb-2">My Project(s)</h6>
-        {% if projects %}
-          <ul class="list-unstyled small mb-0">
+      <form method="get" class="d-flex gap-2">
+        <div>
+          <label class="form-label fw-semibold mb-1">Project</label>
+          <select name="project_id" class="form-select form-select-sm"
+                  onchange="this.form.submit()">
+            <option value="">Select project</option>
             {% for p in projects %}
-            <li class="mb-1">• {{ p.name }}</li>
+            <option value="{{ p._id }}"
+              {% if selected_project and selected_project|string == p._id|string %}selected{% endif %}>
+              {{ p.name }}
+            </option>
             {% endfor %}
-          </ul>
-        {% else %}
-          <p class="text-muted small mb-0">
-            You are not assigned to any specific project.
-          </p>
-        {% endif %}
-      </div>
+          </select>
+        </div>
+      </form>
     </div>
 
-    <!-- Teammates -->
-    <div class="card shadow-sm">
-      <div class="card-body">
-        <h6 class="fw-semibold mb-2">My Team Members</h6>
-        {% if teammates %}
-          <ul class="list-unstyled small mb-0">
-            {% for t in teammates %}
-            <li class="mb-1">
-              • {{ t.name }}
-              {% if t.email %}<br><span class="text-muted">{{ t.email }}</span>{% endif %}
-            </li>
-            {% endfor %}
-          </ul>
-        {% else %}
-          <p class="text-muted small mb-0">
-            No teammates found in your project(s).
-          </p>
-        {% endif %}
+    {% if not projects %}
+      <p class="text-muted mb-0">
+        You are not registered under any project yet. Contact your manager.
+      </p>
+    {% elif not team_members %}
+      <p class="text-muted mb-0">
+        No team members found for the selected project.
+      </p>
+    {% else %}
+      <p class="text-muted small">
+        Each row below is a team member in the selected project. Scroll inside each mini
+        calendar to see the full week.
+      </p>
+
+      <div class="row g-3 mt-2">
+        {% for u in team_members %}
+        <div class="col-12">
+          <div class="card mb-2">
+            <div class="card-body">
+              <h6 class="mb-2">
+                {{ u.name }} <span class="text-muted">({{ u.email }})</span>
+              </h6>
+              <div id="team-cal-{{ u._id }}" class="mini-cal"></div>
+            </div>
+          </div>
+        </div>
+        {% endfor %}
       </div>
-    </div>
+    {% endif %}
   </div>
+
 </div>
+
 {% endblock %}
 
 {% block scripts %}
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-  const cal = new FullCalendar.Calendar(document.getElementById("myCalendar"), {
-    initialView: window.innerWidth < 768 ? "dayGridMonth" : "timeGridWeek",
-    height: "auto",
-    nowIndicator: true,
-    headerToolbar: {
-      left: "prev,next today",
-      center: "title",
-      right: "dayGridMonth,timeGridWeek,timeGridDay"
-    },
-    events: "{{ url_for('member.api_my_shifts') }}",
-    eventDisplay: "block"
-  });
 
-  cal.render();
+<!-- TEAM MEMBERS DATA (SAFE JSON) -->
+<script type="application/json" id="team-members-data">
+  {{ team_members | default([]) | tojson }}
+</script>
+<script type="application/json" id="selected-project-id">
+  {{ selected_project | tojson if selected_project else 'null' }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function () {
+
+  // ----------------- MY OWN CALENDAR -----------------
+  const myCalEl = document.getElementById('myCalendar');
+  const myApiUrl = "{{ url_for('member.api_my_shifts') }}";
+
+  if (myCalEl) {
+    const myCalendar = new FullCalendar.Calendar(myCalEl, {
+      initialView: 'dayGridMonth',
+      height: 600,
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      events: myApiUrl,
+      eventDidMount: function(info) {
+        if (info.event.title) {
+          info.el.title = info.event.title;
+        }
+        // Add profile picture to event
+        const profilePic = info.event.extendedProps?.profile_pic || 'default.png';
+        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
+        const img = document.createElement('img');
+        img.src = profilePicUrl;
+        img.style.width = '20px';
+        img.style.height = '20px';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        img.style.marginRight = '4px';
+        img.style.verticalAlign = 'middle';
+        img.onerror = function() {
+          this.src = '/static/uploads/profile_pics/default.png';
+        };
+        if (info.el.querySelector('.fc-event-title')) {
+          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
+        } else {
+          info.el.insertBefore(img, info.el.firstChild);
+        }
+      }
+    });
+    myCalendar.render();
+  }
+
+  // ----------------- TEAM ROW VIEW -----------------
+  const teamMembersData = JSON.parse(
+    document.getElementById('team-members-data').textContent
+  );
+
+  const teamApiUrl = "/member/api/team_shifts";
+  const selectedProjectId = JSON.parse(
+    document.getElementById('selected-project-id').textContent
+  );
+
+  teamMembersData.forEach(function (user) {
+    const userId = String(user._id);
+    const el = document.getElementById('team-cal-' + userId);
+    if (!el) return;
+
+    const calendar = new FullCalendar.Calendar(el, {
+      initialView: 'timeGridWeek',
+      height: 220,
+      slotMinTime: '06:00:00',
+      slotMaxTime: '23:00:00',
+      headerToolbar: { left: '', center: '', right: '' },
+
+      events: function(fetchInfo, successCallback, failureCallback) {
+        const params = new URLSearchParams();
+        params.append('user_id', userId);
+
+        if (selectedProjectId && selectedProjectId !== null) {
+          params.append('project_id', selectedProjectId);
+        }
+
+        fetch(teamApiUrl + '?' + params.toString())
+          .then(res => res.json())
+          .then(data => successCallback(data))
+          .catch(err => failureCallback(err));
+      },
+
+      eventDidMount: function(info) {
+        if (info.event.extendedProps && info.event.extendedProps.tooltip) {
+          info.el.title = info.event.extendedProps.tooltip;
+        }
+        // Add profile picture to event
+        const profilePic = info.event.extendedProps?.profile_pic || 'default.png';
+        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
+        const img = document.createElement('img');
+        img.src = profilePicUrl;
+        img.style.width = '20px';
+        img.style.height = '20px';
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        img.style.marginRight = '4px';
+        img.style.verticalAlign = 'middle';
+        img.onerror = function() {
+          this.src = '/static/uploads/profile_pics/default.png';
+        };
+        if (info.el.querySelector('.fc-event-title')) {
+          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
+        } else {
+          info.el.insertBefore(img, info.el.firstChild);
+        }
+      }
+    });
+
+    calendar.render();
+  });
 });
 </script>
+
+<style>
+.mini-cal {
+  border: 1px solid #e5e5e5;
+  border-radius: 6px;
+  overflow: hidden;
+}
+</style>
+
 {% endblock %}
