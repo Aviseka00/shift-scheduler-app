@@ -44,6 +44,9 @@
       <p class="text-muted mb-0 small">Visualize and manage all team shifts</p>
     </div>
     <div class="d-flex flex-wrap gap-2">
+      <a href="/manager/upload-excel" class="btn btn-sm btn-success">
+        📤 Upload/Copy-Paste Shifts
+      </a>
       <a href="/manager/export/csv" class="btn btn-sm btn-outline-success">
         📊 Export CSV
       </a>
@@ -202,6 +205,16 @@ document.addEventListener('DOMContentLoaded', function() {
   projectFilter.addEventListener('change', function() {
     calendar.refetchEvents();
   });
+
+  // Auto-refresh calendar after import
+  {% if request.args.get('imported') == '1' %}
+  setTimeout(function() {
+    if (typeof calendar !== 'undefined') {
+      calendar.refetchEvents();
+      console.log('Calendar refreshed after import');
+    }
+  }, 500);
+  {% endif %}
 
   function saveShiftMove(info) {
     fetch("/manager/api/update-shift", {

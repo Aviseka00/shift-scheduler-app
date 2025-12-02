@@ -42,12 +42,358 @@
     {% endif %}
   </div>
 
+  <!-- MY SHIFTS CALENDAR (PERSONAL VIEW) -->
+  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.4s;">
+    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
+      <div>
+        <h5 class="mb-1 fw-bold" style="color: #2d3748;">
+          <i class="fas fa-user-clock me-2"></i>My Shifts Calendar
+        </h5>
+        <p class="text-muted small mb-0">
+          View your personal shift schedule
+        </p>
+      </div>
+    </div>
+    
+    <div class="shift-legend mb-3">
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
+        <small><strong>Shift A</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #198754;"></span>
+        <small><strong>Shift B</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #ffc107;"></span>
+        <small><strong>Shift C</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
+        <small><strong>Shift G</strong></small>
+      </div>
+    </div>
+    
+    <div id="myShiftsCalendar" style="min-height: 500px;"></div>
+  </div>
+
+  <!-- TEAM CALENDAR (SHOWS ALL MEMBERS' SHIFTS - LIKE MANAGER VIEW) -->
+  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.5s;">
+    <div class="mb-3">
+      <h5 class="mb-1 fw-bold" style="color: #2d3748;">
+        <i class="fas fa-calendar-alt me-2"></i>Team Schedule (All Members - All Projects)
+      </h5>
+      <p class="text-muted small mb-0">
+        View all team members' shifts across all projects. <strong>Your shifts</strong> have a red border.
+      </p>
+    </div>
+    
+    <div class="shift-legend mb-3">
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
+        <small><strong>Shift A</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #198754;"></span>
+        <small><strong>Shift B</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #ffc107;"></span>
+        <small><strong>Shift C</strong></small>
+      </div>
+      <div class="shift-legend-item">
+        <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
+        <small><strong>Shift G</strong></small>
+      </div>
+    </div>
+    
+    <div id="teamCalendar" style="min-height: 600px;"></div>
+  </div>
+
   {% if upcoming %}
-  <div class="text-center animate-fade-in-up" style="animation-delay: 0.4s;">
+  <div class="text-center animate-fade-in-up" style="animation-delay: 0.6s;">
     <a class="btn btn-primary btn-lg" href="{{ url_for('member.my_schedule') }}">
       📊 View Full Schedule
     </a>
   </div>
   {% endif %}
 </div>
+{% endblock %}
+
+{% block scripts %}
+<!-- ALL SHIFTS DATA FOR CALENDAR -->
+<script type="application/json" id="all-shifts-data">
+  {{ all_shifts | tojson if all_shifts else '[]' }}
+</script>
+<script type="application/json" id="projects-map-data">
+  {{ projects_map | tojson if projects_map else '{}' }}
+</script>
+
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+  // ----------------- MY SHIFTS CALENDAR (PERSONAL) -----------------
+  const myShiftsCalEl = document.getElementById('myShiftsCalendar');
+  const currentUserId = "{{ current_user_id }}";
+  
+  // Get all shifts data for calendar
+  const allShifts = JSON.parse(document.getElementById('all-shifts-data').textContent);
+  const projectsMap = JSON.parse(document.getElementById('projects-map-data').textContent);
+  
+  // Convert upcoming shifts to calendar events
+  const shiftColors = {
+    "A": "#0d6efd",
+    "B": "#198754",
+    "C": "#ffc107",
+    "G": "#6f42c1"
+  };
+  
+  function convertShiftsToEvents(shifts) {
+    const events = [];
+    if (!shifts || shifts.length === 0) {
+      console.log('No shifts data available');
+      return events;
+    }
+    
+    console.log('Converting', shifts.length, 'shifts to calendar events');
+    
+    shifts.forEach(function(shift) {
+      try {
+        const dateStr = shift.date;
+        if (!dateStr) {
+          console.warn('Shift missing date:', shift);
+          return;
+        }
+        
+        const shiftCode = shift.shift_code || "";
+        const startTime = shift.start_time || "09:00";
+        const endTime = shift.end_time || "17:00";
+        
+        // Parse date
+        const dateObj = new Date(dateStr + "T00:00:00");
+        if (isNaN(dateObj.getTime())) {
+          console.warn('Invalid date:', dateStr);
+          return;
+        }
+        
+        const start = dateStr + "T" + startTime + ":00";
+        
+        let end;
+        if (shiftCode === "C") {
+          // Night shift - ends next day
+          const nextDay = new Date(dateObj);
+          nextDay.setDate(nextDay.getDate() + 1);
+          const nextDayStr = nextDay.toISOString().split('T')[0];
+          end = nextDayStr + "T" + endTime + ":00";
+        } else {
+          end = dateStr + "T" + endTime + ":00";
+        }
+        
+        // Get project name - handle ObjectId conversion
+        let projectName = "General";
+        const projectId = shift.project_id;
+        if (projectId) {
+          const projectIdStr = String(projectId);
+          projectName = projectsMap[projectIdStr] || projectsMap[String(projectId)] || "General";
+        }
+        
+        const task = shift.task || "";
+        
+        // Create title
+        let title = shiftCode || "Shift";
+        if (task) title += " - " + task;
+        if (projectName !== "General") title += " [" + projectName + "]";
+        
+        const color = shiftColors[shiftCode] || "#0dcaf0";
+        
+        // Handle ObjectId conversion
+        let shiftId = "shift-" + Math.random();
+        if (shift._id) {
+          shiftId = shift._id.$oid || shift._id.toString() || String(shift._id);
+        } else if (shift.id) {
+          shiftId = String(shift.id);
+        }
+        
+        events.push({
+          id: String(shiftId),
+          title: title,
+          start: start,
+          end: end,
+          backgroundColor: color,
+          borderColor: "#ff0000",
+          borderWidth: 3,
+          extendedProps: {
+            shift_code: shiftCode,
+            project: projectName,
+            task: task,
+            start_time: startTime,
+            end_time: endTime,
+            is_my_shift: true,
+            tooltip: `My ${shiftCode} Shift\nProject: ${projectName}\nTime: ${startTime} - ${endTime}${task ? '\nTask: ' + task : ''}`
+          }
+        });
+      } catch (err) {
+        console.error('Error converting shift to event:', err, shift);
+      }
+    });
+    
+    console.log('Successfully converted', events.length, 'shifts to calendar events');
+    return events;
+  }
+  
+  if (myShiftsCalEl) {
+    const myShiftsCalendar = new FullCalendar.Calendar(myShiftsCalEl, {
+      initialView: 'dayGridMonth',
+      height: 'auto',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      slotMinTime: '06:00:00',
+      slotMaxTime: '23:00:00',
+      expandRows: true,
+      nowIndicator: true,
+      editable: false,
+      events: function(fetchInfo, successCallback, failureCallback) {
+        // Use shifts data directly from template (simpler and more reliable)
+        console.log('Loading shifts from template data, count:', allShifts.length);
+        const events = convertShiftsToEvents(allShifts);
+        console.log('Converted to calendar events:', events.length);
+        if (events.length > 0) {
+          console.log('First event:', events[0]);
+        }
+        successCallback(events);
+        
+        // Also try API as backup (optional)
+        fetch("/member/api/my_shifts")
+          .then(response => response.json())
+          .then(data => {
+            if (data && data.length > 0 && data.length > events.length) {
+              console.log('API returned more events, updating calendar');
+              successCallback(data);
+            }
+          })
+          .catch(err => {
+            console.log('API not available, using template data');
+          });
+      },
+      eventDidMount: function(info) {
+        const props = info.event.extendedProps || {};
+        
+        // Add tooltip
+        if (props.tooltip) {
+          info.el.title = props.tooltip;
+        } else if (info.event.title) {
+          info.el.title = info.event.title;
+        }
+        
+        // Highlight own shifts with red border and bold
+        info.el.style.fontWeight = 'bold';
+        info.el.style.borderWidth = '3px';
+        info.el.style.borderColor = '#ff0000';
+        info.el.style.boxShadow = '0 0 8px rgba(255, 0, 0, 0.5)';
+      },
+      eventClick: function(info) {
+        const props = info.event.extendedProps || {};
+        const message = `My Shift Details:\n\n` +
+          `Shift: ${props.shift_code || 'N/A'}\n` +
+          `Project: ${props.project || 'General'}\n` +
+          `Task: ${props.task || 'None'}\n` +
+          `Time: ${props.start_time || ''} - ${props.end_time || ''}\n` +
+          `Date: ${info.event.start.toLocaleDateString()}`;
+        alert(message);
+      }
+    });
+    
+    myShiftsCalendar.render();
+  }
+
+  // ----------------- TEAM CALENDAR (ALL MEMBERS) -----------------
+  const teamCalEl = document.getElementById('teamCalendar');
+  
+  if (teamCalEl) {
+    // Use same view as manager (timeGridWeek on desktop, dayGridMonth on mobile)
+    const isMobile = window.innerWidth < 768;
+    
+    const teamCalendar = new FullCalendar.Calendar(teamCalEl, {
+      initialView: isMobile ? 'dayGridMonth' : 'timeGridWeek',
+      height: 'auto',
+      headerToolbar: {
+        left: 'prev,next today',
+        center: 'title',
+        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+      },
+      slotMinTime: '06:00:00',
+      slotMaxTime: '23:00:00',
+      expandRows: true,
+      nowIndicator: true,
+      editable: false,  // Read-only for members
+      events: function(fetchInfo, successCallback, failureCallback) {
+        fetch("/member/api/all_team_shifts")
+          .then(response => {
+            if (!response.ok) {
+              throw new Error('Network response was not ok');
+            }
+            return response.json();
+          })
+          .then(data => {
+            console.log('Team calendar events loaded:', data);
+            successCallback(data);
+          })
+          .catch(err => {
+            console.error('Error loading team calendar events:', err);
+            failureCallback(err);
+          });
+      },
+      eventDidMount: function(info) {
+        const props = info.event.extendedProps || {};
+        const isMyShift = props.is_my_shift === true;
+        
+        // Add tooltip (like manager view)
+        if (props.tooltip) {
+          info.el.title = props.tooltip;
+        }
+        
+        // Highlight own shifts
+        if (isMyShift) {
+          info.el.style.fontWeight = 'bold';
+          info.el.style.boxShadow = '0 0 8px rgba(255, 0, 0, 0.5)';
+        }
+        
+        // Add profile picture to event (EXACTLY like manager view)
+        const profilePic = props.profile_pic || 'default.png';
+        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
+        const img = document.createElement('img');
+        img.src = profilePicUrl;
+        img.style.width = '24px';  // Same size as manager
+        img.style.height = '24px';  // Same size as manager
+        img.style.borderRadius = '50%';
+        img.style.objectFit = 'cover';
+        img.style.marginRight = '6px';  // Same spacing as manager
+        img.style.verticalAlign = 'middle';
+        img.onerror = function() {
+          this.src = '/static/uploads/profile_pics/default.png';
+        };
+        if (info.el.querySelector('.fc-event-title')) {
+          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
+        } else {
+          info.el.insertBefore(img, info.el.firstChild);
+        }
+      },
+      eventClick: function(info) {
+        const props = info.event.extendedProps || {};
+        const isMyShift = props.is_my_shift === true;
+        const message = isMyShift 
+          ? `My Shift: ${props.shift_code || ''}\nProject: ${props.project || 'General'}\nTask: ${props.task || 'None'}`
+          : `${props.user_name || 'Unknown'}'s Shift: ${props.shift_code || ''}\nProject: ${props.project || 'General'}\nTask: ${props.task || 'None'}`;
+        alert(message);
+      }
+    });
+    
+    teamCalendar.render();
+  } else {
+    console.error('Team calendar element not found');
+  }
+});
+</script>
 {% endblock %}

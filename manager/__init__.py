@@ -1,5 +1,13 @@
 from flask import Blueprint
 
-manager_bp = Blueprint("manager", __name__, template_folder="../templates/manager")
+# Correct blueprint configuration
+from flask import Blueprint
 
-from . import routes  # noqa
+manager_bp = Blueprint(
+    "manager",
+    __name__,
+    template_folder="../templates",
+    static_folder="../static"
+)
+
+from . import routes

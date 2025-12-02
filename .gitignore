@@ -1,9 +1,13 @@
-# Environment variables
+# ============================
+# Environment Variables
+# ============================
 .env
 .env.local
 read.text
 
+# ============================
 # Python
+# ============================
 __pycache__/
 *.py[cod]
 *$py.class
@@ -23,24 +27,39 @@ Scripts/
 *.pyd
 .Python
 
-# IDE
+# ============================
+# IDE / Editor
+# ============================
 .vscode/
 .idea/
 *.swp
 *.swo
 
-# OS
+# ============================
+# OS Generated Files
+# ============================
 .DS_Store
 Thumbs.db
 
+# ============================
 # Logs
+# ============================
 *.log
 
-# Uploads (keep folder structure but ignore files)
+# ============================
+# Uploads (ignore uploaded images)
+# Keep the folder but not files
+# ============================
 static/uploads/profile_pics/*
 !static/uploads/profile_pics/.gitkeep
 
-# Documentation files (optional - remove if you want to keep them)
+static/uploads/*
+!static/uploads/.gitkeep
+
+# ============================
+# Documentation (Optional)
+# Remove from ignore if you want to keep them in repo
+# ============================
 IMPROVEMENTS_*.md
 SAFE_IMPROVEMENTS.md
 DEPLOYMENT*.md
@@ -48,4 +67,3 @@ GITHUB_SETUP.md
 MONGODB_ATLAS_FIX.md
 PUSH_TO_GITHUB.md
 TESTING_GUIDE.md
-

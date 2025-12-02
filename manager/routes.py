@@ -223,73 +223,96 @@ def api_shifts():
     """
     Returns shifts as FullCalendar events (for manager calendar).
     Optional filters: ?user_id=...&project_id=...
+    Production-ready with error handling and caching considerations.
     """
-    query = {}
-    user_id = request.args.get("user_id")
-    project_id = request.args.get("project_id")
+    try:
+        query = {}
+        user_id = request.args.get("user_id")
+        project_id = request.args.get("project_id")
 
-    if user_id:
-        query["user_id"] = ObjectId(user_id)
-    if project_id:
-        query["project_id"] = ObjectId(project_id)
+        if user_id:
+            try:
+                query["user_id"] = ObjectId(user_id)
+            except:
+                return jsonify({"error": "Invalid user_id"}), 400
+        if project_id:
+            try:
+                query["project_id"] = ObjectId(project_id)
+            except:
+                return jsonify({"error": "Invalid project_id"}), 400
 
-    shifts_cursor = mongo.db.shifts.find(query)
+        shifts_cursor = mongo.db.shifts.find(query).sort("date", 1)
 
-    users_list = list(mongo.db.users.find())
-    users_map = {str(u["_id"]): {"name": u.get("name", "Unknown"), "profile_pic": u.get("profile_picture", "default.png")} for u in users_list}
-    projects_map = {str(p["_id"]): p["name"] for p in mongo.db.projects.find()}
+        users_list = list(mongo.db.users.find())
+        users_map = {str(u["_id"]): {"name": u.get("name", "Unknown"), "profile_pic": u.get("profile_picture", "default.png")} for u in users_list}
+        projects_map = {str(p["_id"]): p["name"] for p in mongo.db.projects.find()}
 
-    events = []
-    for s in shifts_cursor:
-        date_str = s["date"]  # "YYYY-MM-DD"
-        start_time = s.get("start_time") or "09:00"
-        end_time = s.get("end_time") or "17:00"
-        shift_code = s.get("shift_code", "")
+        events = []
+        for s in shifts_cursor:
+            try:
+                date_str = s.get("date")  # "YYYY-MM-DD"
+                if not date_str:
+                    continue
+                    
+                start_time = s.get("start_time") or "09:00"
+                end_time = s.get("end_time") or "17:00"
+                shift_code = s.get("shift_code", "")
 
-        date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
-        start = f"{date_str}T{start_time}:00"
+                try:
+                    date_obj = datetime.strptime(date_str, "%Y-%m-%d").date()
+                except:
+                    continue
 
-        # Night shift: C → end next day
-        if shift_code == "C":
-            end_date = date_obj + timedelta(days=1)
-            end = f"{end_date.isoformat()}T{end_time}:00"
-        else:
-            end = f"{date_str}T{end_time}:00"
+                start = f"{date_str}T{start_time}:00"
 
-        uid = str(s["user_id"])
-        pid = str(s.get("project_id")) if s.get("project_id") else None
+                # Night shift: C → end next day
+                if shift_code == "C":
+                    end_date = date_obj + timedelta(days=1)
+                    end = f"{end_date.isoformat()}T{end_time}:00"
+                else:
+                    end = f"{date_str}T{end_time}:00"
 
-        user_info = users_map.get(uid, {"name": "Unknown", "profile_pic": "default.png"})
-        user_name = user_info["name"]
-        profile_pic = user_info["profile_pic"]
-        project_name = projects_map.get(pid, "General") if pid else "General"
-        task = s.get("task", "")
+                uid = str(s.get("user_id", ""))
+                pid = str(s.get("project_id")) if s.get("project_id") else None
 
-        color = SHIFT_COLORS.get(shift_code, "#0dcaf0")
-        tooltip = f"{user_name} • {project_name} • {shift_code} • {task}"
+                user_info = users_map.get(uid, {"name": "Unknown", "profile_pic": "default.png"})
+                user_name = user_info["name"]
+                profile_pic = user_info["profile_pic"]
+                project_name = projects_map.get(pid, "General") if pid else "General"
+                task = s.get("task", "")
 
-        events.append(
-            {
-                "id": str(s["_id"]),
-                "title": f"{project_name}: {user_name} – {shift_code}",
-                "start": start,
-                "end": end,
-                "backgroundColor": color,
-                "borderColor": color,
-                "extendedProps": {
-                    "shift_id": str(s["_id"]),
-                    "user": user_name,
-                    "user_id": uid,
-                    "profile_pic": profile_pic,
-                    "project": project_name,
-                    "task": task,
-                    "shift_code": shift_code,
-                    "tooltip": tooltip,
-                },
-            }
-        )
+                color = SHIFT_COLORS.get(shift_code, "#0dcaf0")
+                tooltip = f"{user_name} • {project_name} • {shift_code} • {task}"
 
-    return jsonify(events)
+                events.append(
+                    {
+                        "id": str(s["_id"]),
+                        "title": f"{project_name}: {user_name} – {shift_code}",
+                        "start": start,
+                        "end": end,
+                        "backgroundColor": color,
+                        "borderColor": color,
+                        "extendedProps": {
+                            "shift_id": str(s["_id"]),
+                            "user": user_name,
+                            "user_id": uid,
+                            "profile_pic": profile_pic,
+                            "project": project_name,
+                            "task": task,
+                            "shift_code": shift_code,
+                            "tooltip": tooltip,
+                        },
+                    }
+                )
+            except Exception as e:
+                # Log error but continue processing other shifts
+                current_app.logger.error(f"Error processing shift {s.get('_id')}: {str(e)}")
+                continue
+
+        return jsonify(events)
+    except Exception as e:
+        current_app.logger.error(f"Error in api_shifts: {str(e)}")
+        return jsonify({"error": "Internal server error"}), 500
 
 
 # =========================================================
@@ -862,27 +885,220 @@ def manage_shifts():
 # =========================================================
 # EXCEL UPLOAD FOR BULK SHIFT IMPORT
 # =========================================================
-@manager_bp.route("/upload-excel", methods=["GET", "POST"], endpoint="upload_excel")
-@manager_required
+@manager_bp.route("/upload-excel", methods=["GET", "POST"])
+@manager_required  
 def upload_excel():
     """
-    Upload Excel file to bulk import shifts.
+    Upload Excel file or copy-paste data to bulk import shifts.
     Expected columns: Date, Member Name, Project, Shift (A/B/C/G), Task
+    Supports both Excel file upload and copy-paste from spreadsheet
     """
-    if not OPENPYXL_AVAILABLE:
-        flash("Excel upload feature requires 'openpyxl' package. Please install it using: pip install openpyxl", "danger")
-        return redirect(url_for("manager.dashboard"))
-    
     if request.method == "POST":
+        action = request.form.get("action", "upload")
+        
+        # Handle copy-paste import
+        if action == "paste":
+            paste_data = request.form.get("paste_data", "").strip()
+            if not paste_data:
+                flash("Please paste data from your spreadsheet.", "danger")
+                return redirect("/manager/upload-excel")
+            
+            try:
+                # Parse pasted data (tab or comma separated)
+                lines = paste_data.strip().split('\n')
+                if not lines:
+                    flash("No data found in pasted content.", "danger")
+                    return redirect("/manager/upload-excel")
+                
+                # Detect delimiter (tab or comma)
+                first_line = lines[0]
+                if '\t' in first_line:
+                    delimiter = '\t'
+                elif ',' in first_line:
+                    delimiter = ','
+                else:
+                    # Try to split by multiple spaces
+                    delimiter = None
+                
+                # Parse header row
+                if delimiter:
+                    headers = [h.strip().lower() for h in first_line.split(delimiter)]
+                else:
+                    headers = [h.strip().lower() for h in first_line.split()]
+                
+                # Find column indices
+                date_col = None
+                member_col = None
+                project_col = None
+                shift_col = None
+                task_col = None
+                
+                for idx, header in enumerate(headers):
+                    if "date" in header:
+                        date_col = idx
+                    elif "member" in header or ("name" in header and "project" not in header):
+                        member_col = idx
+                    elif "project" in header:
+                        project_col = idx
+                    elif "shift" in header:
+                        shift_col = idx
+                    elif "task" in header:
+                        task_col = idx
+                
+                if date_col is None or member_col is None or shift_col is None:
+                    flash("Pasted data must include Date, Member Name, and Shift columns.", "danger")
+                    return redirect("/manager/upload-excel")
+                
+                # Get all users and projects for mapping
+                users_list = list(mongo.db.users.find({"role": "member"}))
+                users_map = {u.get("name", "").lower(): u["_id"] for u in users_list}
+                users_map.update({u.get("email", "").lower(): u["_id"] for u in users_list})
+                
+                projects_list = list(mongo.db.projects.find())
+                projects_map = {p.get("name", "").lower(): p["_id"] for p in projects_list}
+                
+                imported_count = 0
+                error_count = 0
+                errors = []
+                
+                # Process data rows (skip header)
+                for row_idx, line in enumerate(lines[1:], 2):
+                    try:
+                        if not line.strip():
+                            continue
+                        
+                        # Split row
+                        if delimiter:
+                            values = [v.strip() for v in line.split(delimiter)]
+                        else:
+                            values = [v.strip() for v in line.split()]
+                        
+                        # Get values
+                        date_val = values[date_col] if date_col < len(values) else None
+                        member_val = values[member_col] if member_col < len(values) else None
+                        project_val = values[project_col] if project_col and project_col < len(values) else None
+                        shift_val = values[shift_col] if shift_col < len(values) else None
+                        task_val = values[task_col] if task_col and task_col < len(values) else None
+                        
+                        # Skip empty rows
+                        if not date_val or not member_val or not shift_val:
+                            continue
+                        
+                        # Parse date
+                        date_str = None
+                        date_formats = ["%Y-%m-%d", "%d/%m/%Y", "%m/%d/%Y", "%d-%m-%Y", "%Y/%m/%d", "%d.%m.%Y"]
+                        for fmt in date_formats:
+                            try:
+                                date_obj = datetime.strptime(date_val.strip(), fmt)
+                                date_str = date_obj.strftime("%Y-%m-%d")
+                                break
+                            except:
+                                continue
+                        
+                        if not date_str:
+                            errors.append(f"Row {row_idx}: Invalid date format '{date_val}'")
+                            error_count += 1
+                            continue
+                        
+                        # Find user
+                        member_key = str(member_val).strip().lower()
+                        user_id = users_map.get(member_key)
+                        if not user_id:
+                            errors.append(f"Row {row_idx}: Member '{member_val}' not found")
+                            error_count += 1
+                            continue
+                        
+                        # Find project (optional)
+                        project_id = None
+                        if project_val and project_val.strip():
+                            project_key = str(project_val).strip().lower()
+                            project_id = projects_map.get(project_key)
+                        
+                        # Validate shift code
+                        shift_code = str(shift_val).strip().upper()
+                        if shift_code not in ["A", "B", "C", "G"]:
+                            errors.append(f"Row {row_idx}: Invalid shift code '{shift_code}'. Must be A, B, C, or G")
+                            error_count += 1
+                            continue
+                        
+                        # Get shift timings
+                        start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("09:00", "17:00"))
+                        
+                        # Check for existing shift
+                        existing = mongo.db.shifts.find_one({
+                            "user_id": user_id,
+                            "date": date_str
+                        })
+                        
+                        task_str = str(task_val).strip() if task_val else ""
+                        
+                        shift_doc = {
+                            "user_id": user_id,
+                            "date": date_str,
+                            "shift_code": shift_code,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "task": task_str,
+                            "project_id": project_id,
+                            "created_at": datetime.utcnow(),
+                            "updated_at": datetime.utcnow()
+                        }
+                        
+                        if existing:
+                            mongo.db.shifts.update_one(
+                                {"_id": existing["_id"]},
+                                {"$set": shift_doc}
+                            )
+                        else:
+                            mongo.db.shifts.insert_one(shift_doc)
+                        
+                        # Send notification
+                        mongo.db.notifications.insert_one({
+                            "user_id": user_id,
+                            "message": f"You have been assigned a {shift_code} shift on {date_str}.",
+                            "created_at": datetime.utcnow(),
+                            "read": False,
+                        })
+                        
+                        imported_count += 1
+                        
+                    except Exception as e:
+                        errors.append(f"Row {row_idx}: {str(e)}")
+                        error_count += 1
+                        continue
+                
+                if imported_count > 0:
+                    flash(f"Successfully imported {imported_count} shifts from pasted data! The calendar will refresh automatically.", "success")
+                if error_count > 0:
+                    flash(f"Encountered {error_count} errors during import. Check details below.", "warning")
+                
+                if errors:
+                    session["excel_import_errors"] = errors[:20]  # Store first 20 errors
+                
+                # Redirect to dashboard to see the updated calendar
+                if imported_count > 0:
+                    return redirect(url_for("manager.dashboard") + "?imported=1")
+                else:
+                    return redirect("/manager/upload-excel")
+                
+            except Exception as e:
+                flash(f"Error processing pasted data: {str(e)}", "danger")
+                return redirect("/manager/upload-excel")
+        
+        # Handle Excel file upload
+        if not OPENPYXL_AVAILABLE:
+            flash("Excel upload feature requires 'openpyxl' package. Please install it using: pip install openpyxl", "danger")
+            return redirect(url_for("manager.dashboard"))
+        
         file = request.files.get("excel_file")
         
         if not file or file.filename == "":
             flash("Please select an Excel file.", "danger")
-            return redirect(url_for("manager.upload_excel"))
+            return redirect("/manager/upload-excel")
         
         if not file.filename.endswith(('.xlsx', '.xls')):
             flash("Invalid file type. Please upload an Excel file (.xlsx or .xls).", "danger")
-            return redirect(url_for("manager.upload_excel"))
+            return redirect("/manager/upload-excel")
         
         try:
             # Load workbook
@@ -914,7 +1130,7 @@ def upload_excel():
             
             if not all([date_col, member_col, shift_col]):
                 flash("Excel file must have Date, Member Name, and Shift columns.", "danger")
-                return redirect(url_for("manager.upload_excel"))
+                return redirect("/manager/upload-excel")
             
             # Get all users and projects for mapping
             users_list = list(mongo.db.users.find({"role": "member"}))
@@ -1001,7 +1217,8 @@ def upload_excel():
                         "end_time": end_time,
                         "task": task_str,
                         "project_id": project_id,
-                        "created_at": datetime.utcnow()
+                        "created_at": datetime.utcnow(),
+                        "updated_at": datetime.utcnow()
                     }
                     
                     if existing:
@@ -1012,6 +1229,14 @@ def upload_excel():
                     else:
                         mongo.db.shifts.insert_one(shift_doc)
                     
+                    # Send notification
+                    mongo.db.notifications.insert_one({
+                        "user_id": user_id,
+                        "message": f"You have been assigned a {shift_code} shift on {date_str}.",
+                        "created_at": datetime.utcnow(),
+                        "read": False,
+                    })
+                    
                     imported_count += 1
                     
                 except Exception as e:
@@ -1020,22 +1245,48 @@ def upload_excel():
                     continue
             
             if imported_count > 0:
-                flash(f"Successfully imported {imported_count} shifts from Excel!", "success")
+                flash(f"Successfully imported {imported_count} shifts from Excel! The calendar will refresh automatically.", "success")
             if error_count > 0:
                 flash(f"Encountered {error_count} errors during import. Check details below.", "warning")
             
             if errors:
                 session["excel_import_errors"] = errors[:20]  # Store first 20 errors
             
-            return redirect(url_for("manager.upload_excel"))
+            # Redirect to dashboard to see the updated calendar
+            if imported_count > 0:
+                return redirect(url_for("manager.dashboard") + "?imported=1")
+            else:
+                return redirect("/manager/upload-excel")
             
         except Exception as e:
             flash(f"Error processing Excel file: {str(e)}", "danger")
-            return redirect(url_for("manager.upload_excel"))
+            return redirect("/manager/upload-excel")
     
     # GET request - show upload form
-    import_errors = session.pop("excel_import_errors", [])
-    return render_template("manager/upload_excel.html", errors=import_errors)
+    try:
+        import_errors = session.pop("excel_import_errors", [])
+    except:
+        import_errors = []
+    
+    try:
+        projects = list(mongo.db.projects.find().sort("name", 1))
+        # Convert ObjectIds to strings for template
+        for p in projects:
+            p["_id"] = str(p["_id"])
+    except Exception as e:
+        current_app.logger.error(f"Error loading projects: {str(e)}")
+        projects = []
+    
+    try:
+        users = list(mongo.db.users.find({"role": "member"}).sort("name", 1))
+        # Convert ObjectIds to strings for template
+        for u in users:
+            u["_id"] = str(u["_id"])
+    except Exception as e:
+        current_app.logger.error(f"Error loading users: {str(e)}")
+        users = []
+    
+    return render_template("manager/upload_excel.html", errors=import_errors, projects=projects, users=users)
 
 
 # =========================================================

@@ -30,3 +30,20 @@ class Config:
     UPLOAD_FOLDER = "static/uploads/profile_pics"
     ALLOWED_EXTENSIONS = {"png", "jpg", "jpeg", "gif"}
     MAX_CONTENT_LENGTH = 4 * 1024 * 1024   # 4MB limit
+    
+    # ------------------------------------------------------------------
+    # PRODUCTION SETTINGS
+    # ------------------------------------------------------------------
+    # Set to False in production for better security
+    DEBUG = os.environ.get("FLASK_DEBUG", "False").lower() == "true"
+    
+    # Session settings
+    SESSION_COOKIE_SECURE = os.environ.get("SESSION_COOKIE_SECURE", "False").lower() == "true"  # True in production with HTTPS
+    SESSION_COOKIE_HTTPONLY = True
+    SESSION_COOKIE_SAMESITE = "Lax"
+    
+    # Rate limiting (can be implemented with Flask-Limiter)
+    RATELIMIT_ENABLED = os.environ.get("RATELIMIT_ENABLED", "False").lower() == "true"
+    
+    # Logging
+    LOG_LEVEL = os.environ.get("LOG_LEVEL", "INFO")
