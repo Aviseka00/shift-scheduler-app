@@ -1,218 +1,60 @@
 {% extends "base.html" %}
 {% block content %}
 
-{% set team_members = team_members or [] %}
+<h2 class="fw-bold text-primary mb-3">My Schedule</h2>
 
-<div class="animate-fade-in-up">
+<div class="card p-3 mb-3">
+    <label class="form-label fw-semibold">Select Project</label>
+    <select id="projectSelect" class="form-select" onchange="changeProject()">
+        {% for p in projects %}
+        <option value="{{ p._id }}" {% if selected_project == p._id %}selected{% endif %}>{{ p.name }}</option>
+        {% endfor %}
+    </select>
+</div>
 
-  <!-- MY PERSONAL CALENDAR -->
-  <h2 class="mb-1" style="font-weight: 700;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;">
-    My Schedule
-  </h2>
-  <p class="text-muted mb-4">
-    View your own shifts and your project team's weekly schedule.
-  </p>
-
-  <!-- TEAM CALENDAR (SHOWS ALL MEMBERS' SHIFTS - LIKE MANAGER VIEW) -->
-  <div class="glass-card p-4 mb-4">
-    <div class="mb-3">
-      <h5 class="mb-1" style="font-weight: 600; color: #667eea;">
-        <i class="fas fa-calendar-alt me-2"></i>Team Schedule (All Members - All Projects)
-      </h5>
-      <p class="text-muted small mb-0">
-        View all team members' shifts across all projects. <strong>Your shifts</strong> have a red border.
-      </p>
-    </div>
-    
-    <div class="shift-legend mb-3">
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
-        <small><strong>Shift A</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #198754;"></span>
-        <small><strong>Shift B</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #ffc107;"></span>
-        <small><strong>Shift C</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
-        <small><strong>Shift G</strong></small>
-      </div>
-    </div>
-    
+<div class="card p-3">
+    <h5 class="fw-bold mb-3">Team Calendar</h5>
     <div id="teamCalendar" style="min-height: 600px;"></div>
-  </div>
-
-  <!-- My Shifts Calendar (Personal View) -->
-  <div class="glass-card p-4 mb-4">
-    <h5 class="mb-3" style="font-weight: 600; color: #667eea;">
-      <i class="fas fa-user-clock me-2"></i>My Personal Shifts Only
-    </h5>
-    <div id="myCalendar"></div>
-  </div>
-
 </div>
 
 {% endblock %}
 
 {% block scripts %}
+
 <script>
-document.addEventListener('DOMContentLoaded', function () {
+function changeProject() {
+    window.location.href = "/member/my-schedule?project_id=" + document.getElementById("projectSelect").value;
+}
 
-  // ----------------- TEAM CALENDAR (ALL MEMBERS) -----------------
-  const teamCalEl = document.getElementById('teamCalendar');
-  const currentUserId = "{{ current_user_id }}";
-  
-  if (teamCalEl) {
-    // Use same view as manager (timeGridWeek on desktop, dayGridMonth on mobile)
-    const isMobile = window.innerWidth < 768;
-    
-    const teamCalendar = new FullCalendar.Calendar(teamCalEl, {
-      initialView: isMobile ? 'dayGridMonth' : 'timeGridWeek',
-      height: 'auto',
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-      },
-      slotMinTime: '06:00:00',
-      slotMaxTime: '23:00:00',
-      expandRows: true,
-      nowIndicator: true,
-      editable: false,  // Read-only for members
-      events: function(fetchInfo, successCallback, failureCallback) {
-        fetch("/member/api/all_team_shifts")
-          .then(response => {
-            if (!response.ok) {
-              throw new Error('Network response was not ok');
-            }
-            return response.json();
-          })
-          .then(data => {
-            console.log('Team calendar events loaded:', data);
-            successCallback(data);
-          })
-          .catch(err => {
-            console.error('Error loading team calendar events:', err);
-            failureCallback(err);
-          });
-      },
-      eventDidMount: function(info) {
-        const props = info.event.extendedProps || {};
-        const isMyShift = props.is_my_shift === true;
-        
-        // Add tooltip (like manager view)
-        if (props.tooltip) {
-          info.el.title = props.tooltip;
-        }
-        
-        // Highlight own shifts
-        if (isMyShift) {
-          info.el.style.fontWeight = 'bold';
-          info.el.style.boxShadow = '0 0 8px rgba(255, 0, 0, 0.5)';
-        }
-        
-        // Add profile picture to event (EXACTLY like manager view)
-        const profilePic = props.profile_pic || 'default.png';
-        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
-        const img = document.createElement('img');
-        img.src = profilePicUrl;
-        img.style.width = '24px';  // Same size as manager
-        img.style.height = '24px';  // Same size as manager
-        img.style.borderRadius = '50%';
-        img.style.objectFit = 'cover';
-        img.style.marginRight = '6px';  // Same spacing as manager
-        img.style.verticalAlign = 'middle';
-        img.onerror = function() {
-          this.src = '/static/uploads/profile_pics/default.png';
-        };
-        if (info.el.querySelector('.fc-event-title')) {
-          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
-        } else {
-          info.el.insertBefore(img, info.el.firstChild);
-        }
-      },
-      eventClick: function(info) {
-        const props = info.event.extendedProps || {};
-        const isMyShift = props.is_my_shift === true;
-        const message = isMyShift 
-          ? `My Shift: ${props.shift_code || ''}\nProject: ${props.project || 'General'}\nTask: ${props.task || 'None'}`
-          : `${props.user_name || 'Unknown'}'s Shift: ${props.shift_code || ''}\nProject: ${props.project || 'General'}\nTask: ${props.task || 'None'}`;
-        alert(message);
-      }
-    });
-    
-    teamCalendar.render();
-  }
+document.addEventListener("DOMContentLoaded", function () {
 
-  // ----------------- MY OWN CALENDAR -----------------
-  const myCalEl = document.getElementById('myCalendar');
+    const calendar = new FullCalendar.Calendar(
+        document.getElementById("teamCalendar"),
+        {
+            initialView: window.innerWidth < 768 ? "dayGridMonth" : "timeGridWeek",
+            height: "auto",
+            nowIndicator: true,
+            headerToolbar: {
+                left: "prev,next today",
+                center: "title",
+                right: "dayGridMonth,timeGridWeek,timeGridDay"
+            },
 
-  if (myCalEl) {
-    const myCalendar = new FullCalendar.Calendar(myCalEl, {
-      initialView: 'dayGridMonth',
-      height: 600,
-      headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay'
-      },
-      events: function(fetchInfo, successCallback, failureCallback) {
-        fetch("/member/api/my_shifts")
-          .then(response => {
-            console.log('My Schedule API Response status:', response.status);
-            if (!response.ok) {
-              throw new Error('Network response was not ok: ' + response.status);
+            eventSources: [{
+                url: "/member/api/all_team_shifts",
+                method: "GET"
+            }],
+
+            eventDidMount: function(info) {
+                // NO IMAGES — No flickering
+                if (info.event.extendedProps.tooltip) {
+                    info.el.title = info.event.extendedProps.tooltip;
+                }
             }
-            return response.json();
-          })
-          .then(data => {
-            console.log('My Schedule calendar events loaded:', data);
-            console.log('Number of events:', data.length);
-            if (data && data.length > 0) {
-              console.log('First event:', data[0]);
-            }
-            successCallback(data);
-          })
-          .catch(err => {
-            console.error('Error loading my schedule calendar events:', err);
-            failureCallback(err);
-          });
-      },
-      eventDidMount: function(info) {
-        if (info.event.title) {
-          info.el.title = info.event.title;
         }
-        // Add profile picture to event
-        const profilePic = info.event.extendedProps?.profile_pic || 'default.png';
-        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
-        const img = document.createElement('img');
-        img.src = profilePicUrl;
-        img.style.width = '20px';
-        img.style.height = '20px';
-        img.style.borderRadius = '50%';
-        img.style.objectFit = 'cover';
-        img.style.marginRight = '4px';
-        img.style.verticalAlign = 'middle';
-        img.onerror = function() {
-          this.src = '/static/uploads/profile_pics/default.png';
-        };
-        if (info.el.querySelector('.fc-event-title')) {
-          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
-        } else {
-          info.el.insertBefore(img, info.el.firstChild);
-        }
-      }
-    });
-    myCalendar.render();
-  }
+    );
+
+    calendar.render();
 });
 </script>
 

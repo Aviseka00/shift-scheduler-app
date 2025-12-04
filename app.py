@@ -1,3 +1,10 @@
+# -*- coding: utf-8 -*-
+"""
+Clean UTF-8 safe version of app.py
+All non-ASCII characters removed.
+Safe for Python execution and Render deployment.
+"""
+
 from flask import Flask, redirect, url_for, session, render_template, request
 from dotenv import load_dotenv
 from config import Config
@@ -13,14 +20,14 @@ from manager import manager_bp
 from member import member_bp
 from project.routes import project_bp
 
-# Load environment variables from .env file
+# Load environment variables
 load_dotenv()
 
 
 def create_app(config_class=Config):
     """
     Application factory pattern for creating Flask app instances.
-    This allows for easy testing and configuration management.
+    Enables clean initialization and future modular expansion.
     """
     app = Flask(__name__)
     app.config.from_object(config_class)
@@ -36,13 +43,13 @@ def create_app(config_class=Config):
     # Initialize extensions
     mongo.init_app(app)
 
-    # Register existing blueprints (backward compatibility)
+    # Register core blueprints
     app.register_blueprint(auth_bp)
     app.register_blueprint(manager_bp, url_prefix="/manager")
     app.register_blueprint(member_bp, url_prefix="/member")
     app.register_blueprint(project_bp, url_prefix="/project")
 
-    # Register all modules from registry (for future modules)
+    # Register all modular blueprints
     registry.register_all_blueprints(app)
     registry.initialize_all_modules(app)
 
@@ -62,23 +69,25 @@ def create_app(config_class=Config):
             return jsonify({"error": "Internal server error"}), 500
         return render_template("errors/500.html"), 500
 
+    # Home route
     @app.route("/")
     def index():
+        """Redirect based on logged-in role."""
         if "user_id" in session:
             if session.get("role") == "manager":
                 return redirect("/manager/dashboard")
-            else:
-                return redirect("/member/dashboard")
+            return redirect("/member/dashboard")
         return render_template("index.html")
 
     return app
 
 
+# Create app instance
 app = create_app()
 
 if __name__ == "__main__":
     app.run(
         debug=app.config.get("DEBUG", False),
         host="127.0.0.1",
-        port=5001   # ← FORCE PORT HERE
+        port=5001
     )

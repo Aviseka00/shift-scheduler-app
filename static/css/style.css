@@ -1,283 +1,253 @@
 /* ============================================
    DARK LUXURY UI — BLACK + PURPLE NEON THEME
-   WITH **ALL TEXT PURE WHITE**
+   FULL UPDATED VERSION WITH SHIFT COLORS
    ============================================ */
 
-/* Force all text across the site to white */
-* {
-  transition: all 0.3s ease;
-  color: #ffffff !important;
+/* Global readable text */
+body, p, span, label, div, a, input, select {
+  color: #e4d4ff !important;
+  transition: 0.25s ease;
 }
 
-/* Core Variables */
-:root {
-  --neon-purple: #b44cff;
-  --neon-purple-glow: rgba(180, 76, 255, 0.7);
-  --neon-dark: #0a0a0f;
-  --neon-card: rgba(30, 0, 40, 0.35);
-  --neon-border: rgba(150, 0, 255, 0.4);
+/* Headings */
+h1, h2, h3, h4, h5 {
+  color: #f2e6ff !important;
+  text-shadow: 0 0 6px rgba(200, 120, 255, 0.4);
+}
 
-  --shadow-sm: 0 4px 12px rgba(0, 0, 0, 0.25);
-  --shadow-md: 0 10px 25px rgba(0, 0, 0, 0.35);
-  --shadow-lg: 0 15px 50px rgba(0, 0, 0, 0.6);
+/* Root variables */
+:root {
+  --purple-main: #b44cff;
+  --purple-light: #d8a8ff;
+  --purple-glow: rgba(180, 76, 255, 0.7);
+  --background-dark: #0a0a0f;
+
+  /* SHIFT COLORS */
+  --shift-A: #4c6aff;
+  --shift-B: #2dd67b;
+  --shift-C: #ffe14c;
+  --shift-G: #b54cff;
+
+  --card-bg: rgba(35, 0, 60, 0.5);
+  --card-border: rgba(180, 76, 255, 0.25);
 }
 
 /* Background */
 body {
-  background: radial-gradient(circle at top, #150025, #050007, #000000);
-  color: #ffffff !important;
+  background: radial-gradient(circle at top, #160020, #060009, #000);
   font-family: 'Inter', sans-serif;
   min-height: 100vh;
-  position: relative;
 }
 
-/* Purple glow top */
+/* Glow */
 body::before {
   content: '';
   position: fixed;
-  top: -10%;
-  left: 0;
+  top: -20%;
   width: 100%;
-  height: 40%;
-  background: radial-gradient(circle at 40% 0%, rgba(150, 0, 255, 0.25), transparent);
-  z-index: 0;
-  pointer-events: none;
+  height: 50%;
+  background: radial-gradient(circle at 40% 0%, rgba(150,0,255,0.25), transparent);
 }
-
-/* Purple glow bottom */
 body::after {
   content: '';
   position: fixed;
-  bottom: -10%;
-  left: 0;
+  bottom: -20%;
   width: 100%;
-  height: 40%;
-  background: radial-gradient(circle at 60% 100%, rgba(90, 0, 180, 0.25), transparent);
-  z-index: 0;
+  height: 50%;
+  background: radial-gradient(circle at 60% 100%, rgba(90,0,180,0.25), transparent);
 }
 
-/* Content must appear above glow */
-.container, .card, .navbar, .glass-card { z-index: 1; position: relative; }
+.container, .navbar, .card { position: relative; z-index: 2; }
 
-/* ============================
+/* ============================================
    NAVBAR
-   ============================ */
+   ============================================ */
 .navbar {
-  background: rgba(10, 10, 25, 0.65) !important;
+  background: rgba(15,0,30,0.8) !important;
   backdrop-filter: blur(12px);
-  border-bottom: 1px solid rgba(180, 76, 255, 0.35);
-  box-shadow: 0 8px 25px rgba(50, 0, 90, 0.2);
+  border-bottom: 1px solid var(--card-border);
 }
-
 .navbar-brand {
   font-size: 1.6rem;
   font-weight: 700;
-  background: linear-gradient(135deg, #cc77ff, #8833ff);
+  background: linear-gradient(135deg, #d58cff, #a64cff);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
 }
 
-.nav-link { color: #fff !important; }
-.nav-link:hover { text-shadow: 0 0 10px var(--neon-purple); }
-.nav-link.active { text-shadow: 0 0 15px var(--neon-purple); }
-
-/* Active underline */
-.nav-link.active::after {
-  content: "";
-  display: block;
-  width: 70%;
-  height: 2px;
-  background: var(--neon-purple);
-  margin: 0.2rem auto;
-}
-
-
-/* ============================
-   CARDS / GLASS PANELS
-   ============================ */
-.card,
-.glass-card {
-  background: rgba(25, 0, 40, 0.45);
+/* ============================================
+   CARDS
+   ============================================ */
+.card {
+  background: var(--card-bg);
+  border: 1px solid var(--card-border);
   border-radius: 18px;
-  border: 1px solid rgba(180, 76, 255, 0.35);
-  backdrop-filter: blur(10px);
-  box-shadow: 0 8px 40px rgba(100, 0, 150, 0.4);
+  padding: 1rem;
+  backdrop-filter: blur(8px);
+  box-shadow: 0 8px 30px rgba(80,0,120,0.4);
+}
+.card:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 10px 40px rgba(150,0,255,0.4);
 }
 
-/* Hover brighter */
-.card:hover,
-.glass-card:hover {
-  transform: translateY(-4px);
-  box-shadow: 0 0 25px var(--neon-purple-glow);
-}
-
-/* Card text fix — force white */
-.card * {
-  color: #ffffff !important;
-}
-
-/* ============================
+/* ============================================
    BUTTONS
-   ============================ */
+   ============================================ */
 .btn {
-  border-radius: 12px;
-  border: none;
-  font-weight: 600;
-  padding: 0.7rem 1.3rem;
-}
-
-.btn-primary {
-  background: linear-gradient(135deg, #a23cff, #7b2cbf);
-  box-shadow: 0 0 12px var(--neon-purple-glow);
-}
-
-.btn-primary:hover {
-  background: linear-gradient(135deg, #c560ff, #9d4edd);
-  box-shadow: 0 0 22px rgba(200, 80, 255, 0.9);
-}
-
-.btn-success {
-  background: #00cc7a;
-}
-.btn-danger {
-  background: #ff0059;
-}
-
-.btn-outline-primary {
-  border: 2px solid #b44cff;
-  color: #fff;
-}
-.btn-outline-primary:hover {
-  background: #b44cff;
-  color: #000;
-}
-
-
-/* ============================
-   FORMS
-   ============================ */
-.form-control,
-.form-select {
-  background: rgba(20, 0, 40, 0.5);
-  border: 1px solid rgba(180, 76, 255, 0.35);
-  color: #ffffff !important;
-}
-
-.form-control:focus,
-.form-select:focus {
-  border-color: #d58cff;
-  box-shadow: 0 0 10px rgba(180, 76, 255, 0.5);
-}
-
-
-/* ============================
-   TABLES
-   ============================ */
-.table {
-  background: rgba(20, 0, 40, 0.45);
-  border-radius: 12px;
-  color: #ffffff !important;
-}
-
-.table thead {
-  background: linear-gradient(135deg, #6a00b8, #480088) !important;
-  color: #ffffff !important;
-}
-
-.table tbody tr:hover {
-  background: rgba(180, 76, 255, 0.15) !important;
-}
-
-
-/* ============================
-   ALERTS
-   ============================ */
-.alert {
-  backdrop-filter: blur(10px);
-  border-left: 5px solid var(--neon-purple);
-  background: rgba(40, 0, 80, 0.4);
-  color: #ffffff !important;
-}
-
-
-/* ============================
-   BADGES
-   ============================ */
-.badge {
-  padding: 0.45rem 0.8rem;
-  border-radius: 8px;
-  font-weight: 600;
-  color: #ffffff !important;
-}
-
-.shift-badge-A { background: #4c6aff !important; }
-.shift-badge-B { background: #2dd67b !important; }
-.shift-badge-C { background: #ffe14c !important; color: #000 !important; }
-.shift-badge-G { background: #ba5cff !important; }
-
-
-/* ============================
-   FULLCALENDAR (Neon Edition)
-   ============================ */
-.fc-theme-standard td,
-.fc-theme-standard th {
-  background: #0f0a16 !important;
-  border-color: rgba(150, 100, 200, 0.4) !important;
-  color: #ffffff !important;
-}
-
-.fc-toolbar-title {
-  color: #ffffff !important;
-  text-shadow: 0 0 10px var(--neon-purple);
-}
-
-.fc-button {
-  background: var(--neon-purple) !important;
-  color: #ffffff !important;
+  padding: 0.65rem 1.4rem !important;
+  font-weight: 600 !important;
+  border-radius: 10px !important;
+  min-height: 45px !important;
   border: none !important;
 }
 
+/* Primary button */
+.btn-primary {
+  background: linear-gradient(135deg, #b44cff, #8e33cc) !important;
+  color: #ffffff !important;
+}
+.btn-primary:hover {
+  background: linear-gradient(135deg, #cc77ff, #a44cff) !important;
+  box-shadow: 0 0 14px var(--purple-glow);
+}
+
+/* Success */
+.btn-success {
+  background: #2dd67b !important;
+  color: #000 !important;
+}
+.btn-success:hover {
+  background: #33ee8d !important;
+}
+
+/* Danger */
+.btn-danger {
+  background: #ff3377 !important;
+  color: #000 !important;
+}
+.btn-danger:hover {
+  background: #ff558f !important;
+}
+
+/* ============================================
+   FORMS
+   ============================================ */
+.form-control, .form-select {
+  background: rgba(40,0,60,0.4) !important;
+  border: 1px solid rgba(200,120,255,0.3) !important;
+  color: #f0e6ff !important;
+}
+.form-control:focus {
+  border-color: var(--purple-main) !important;
+  box-shadow: 0 0 10px rgba(150,0,255,0.5) !important;
+}
+
+/* FIX DATE PICKER ICON VISIBILITY */
+input[type="date"]::-webkit-calendar-picker-indicator {
+  filter: invert(1);
+  opacity: 1 !important;
+}
+
+/* ============================================
+   TABLES — BLACK TEXT
+   ============================================ */
+.table {
+  background: #faf5ff !important;
+  border-radius: 12px;
+  width: 100% !important;
+  color: #000 !important;
+}
+.table td, .table th {
+  color: #000 !important;
+}
+
+/* ============================================
+   BADGES
+   ============================================ */
+.shift-badge-A { background: var(--shift-A) !important; color:white !important; }
+.shift-badge-B { background: var(--shift-B) !important; color:black !important; }
+.shift-badge-C { background: var(--shift-C) !important; color:black !important; }
+.shift-badge-G { background: var(--shift-G) !important; color:white !important; }
+
+/* ============================================
+   FULLCALENDAR — FIXED + SHIFT COLORS
+   ============================================ */
+.fc-theme-standard td,
+.fc-theme-standard th {
+  background: #0f0a16 !important;
+  border-color: rgba(150,100,200,0.3) !important;
+  color: #e4d4ff !important;
+}
+
+/* Base event style */
 .fc-event {
-  background: rgba(160, 60, 255, 0.35) !important;
-  border: 1px solid var(--neon-purple) !important;
+  border-radius: 8px !important;
+  border: 2px solid #000 !important;
+  font-weight: 700 !important;
+  padding: 4px !important;
+}
+
+/* SHIFT COLORS */
+.fc-event.shift-A { background: var(--shift-A) !important; color: #fff !important; }
+.fc-event.shift-B { background: var(--shift-B) !important; color: #000 !important; }
+.fc-event.shift-C { background: var(--shift-C) !important; color: #000 !important; }
+.fc-event.shift-G { background: var(--shift-G) !important; color: #fff !important; }
+
+/* Remove flicker by hiding images */
+.fc-event img {
+  display: none !important;
+}
+
+/* ============================================
+   TOOLTIP, TOAST & MODAL FIXES
+   ============================================ */
+.modal-content {
+  background: #1a1120 !important;
   color: #ffffff !important;
-  box-shadow: 0 0 12px rgba(180, 60, 255, 0.5);
 }
 
-.fc-event:hover {
-  transform: scale(1.05);
-  box-shadow: 0 0 20px rgba(200, 80, 255, 0.8);
+.toast, .toast-body {
+  background: rgba(40, 0, 60, 0.9) !important;
+  color: #ffffff !important;
+  border: 1px solid var(--purple-main) !important;
 }
 
+.tooltip-inner {
+  background: #b44cff !important;
+  color: #000 !important;
+  font-weight: 600;
+}
 
-/* ============================
+.popover {
+  background: #1b0f22 !important;
+  border: 1px solid var(--purple-main) !important;
+  color: #ffffff !important;
+}
+
+.popover-header {
+  background: #2c1333 !important;
+  color: #ffffff !important;
+}
+
+.popover-body {
+  background: #1b0f22 !important;
+  color: #ffffff !important;
+}
+
+/* ============================================
    LIST GROUP
-   ============================ */
+   ============================================ */
 .list-group-item {
-  background: rgba(20, 0, 40, 0.5);
-  border-left: 4px solid var(--neon-purple);
-  color: #ffffff !important;
+  background: rgba(25,0,45,0.45);
+  border-left: 4px solid var(--purple-main);
+  color: #e4d4ff !important;
 }
-
 .list-group-item:hover {
-  background: rgba(40, 0, 80, 0.7);
+  background: rgba(60,0,120,0.55);
   transform: translateX(5px);
 }
 
-
-/* ============================
-   MINI CALENDAR
-   ============================ */
-.mini-cal {
-  background: rgba(25, 0, 45, 0.55);
-  border: 1px solid rgba(140, 0, 240, 0.4);
-  border-radius: 12px;
-}
-
-
-/* ============================
-   RESPONSIVE
-   ============================ */
-@media (max-width: 768px) {
-  .btn { width: 100%; }
+@media(max-width:768px){
+  .btn { width:100%; }
 }

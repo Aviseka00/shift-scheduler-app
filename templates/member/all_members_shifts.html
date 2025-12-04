@@ -1,261 +1,124 @@
 {% extends "base.html" %}
-
 {% block content %}
+
 <div class="animate-fade-in-up">
-  <div class="d-flex justify-content-between align-items-center mb-4">
-    <div>
-      <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">
-        All Members Planned Shifts
-      </h2>
-      <p class="text-muted mb-0">View all team members' planned shifts across all projects</p>
-    </div>
-    <div>
-      <a href="/member/export-shifts-pdf" class="btn btn-primary" target="_blank">
-        <i class="fas fa-file-pdf me-2"></i>Export to PDF
-      </a>
-    </div>
-  </div>
 
-  <!-- Date Range Filter -->
-  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.1s;">
-    <div class="row g-3">
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">Start Date</label>
-        <input type="date" id="startDate" class="form-control" value="{{ start_date or '' }}">
-      </div>
-      <div class="col-md-4">
-        <label class="form-label fw-semibold">End Date</label>
-        <input type="date" id="endDate" class="form-control" value="{{ end_date or '' }}">
-      </div>
-      <div class="col-md-4 d-flex align-items-end">
-        <button class="btn btn-primary w-100" onclick="filterShifts()">
-          <i class="fas fa-filter me-2"></i>Filter
-        </button>
-      </div>
+    <div class="d-flex justify-content-between align-items-center mb-4">
+        <div>
+            <h2 class="mb-1 fw-bold text-primary">All Members Planned Shifts</h2>
+            <p class="text-muted">View all team members’ planned shifts (project-wise visibility)</p>
+        </div>
+        <a href="/member/export-shifts-pdf" class="btn btn-primary" target="_blank">
+            <i class="fas fa-file-pdf me-2"></i>Export PDF
+        </a>
     </div>
-  </div>
 
-  <!-- Calendar View -->
-  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.2s;">
-    <div class="d-flex flex-wrap justify-content-between align-items-center mb-3">
-      <div>
-        <h5 class="mb-1 fw-bold" style="color: #2d3748;">
-          <i class="fas fa-calendar-alt me-2"></i>Calendar View
-        </h5>
-        <p class="text-muted small mb-0">
-          View all members' shifts in calendar format. <strong>Your shifts</strong> have a red border.
-        </p>
-      </div>
-    </div>
-    
-    <div class="shift-legend mb-3">
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
-        <small><strong>Shift A</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #198754;"></span>
-        <small><strong>Shift B</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #ffc107;"></span>
-        <small><strong>Shift C</strong></small>
-      </div>
-      <div class="shift-legend-item">
-        <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
-        <small><strong>Shift G</strong></small>
-      </div>
-    </div>
-    
-    <div id="allMembersCalendar" style="min-height: 600px;"></div>
-  </div>
+    <!-- Filter -->
+    <div class="card p-3 mb-3">
+        <div class="row g-3">
+            <div class="col-md-4">
+                <label class="form-label">Start Date</label>
+                <input type="date" id="startDate" class="form-control" value="{{ start_date }}">
+            </div>
 
-  <!-- List View -->
-  <div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.3s;">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h5 class="mb-0 fw-bold" style="color: #2d3748;">
-        <i class="fas fa-list me-2"></i>List View
-      </h5>
-      <div>
-        <button class="btn btn-sm btn-outline-primary" onclick="exportShifts()">
-          <i class="fas fa-download me-1"></i>Export
-        </button>
-      </div>
+            <div class="col-md-4">
+                <label class="form-label">End Date</label>
+                <input type="date" id="endDate" class="form-control" value="{{ end_date }}">
+            </div>
+
+            <div class="col-md-4 d-flex align-items-end">
+                <button onclick="filterShifts()" class="btn btn-primary w-100">
+                    <i class="fas fa-filter me-2"></i>Filter
+                </button>
+            </div>
+        </div>
     </div>
-    
-    {% if all_shifts %}
-    <div class="table-responsive">
-      <table class="table table-hover">
-        <thead>
-          <tr>
-            <th>Date</th>
-            <th>Member</th>
-            <th>Shift</th>
-            <th>Time</th>
-            <th>Project</th>
-            <th>Task</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for shift in all_shifts %}
-          <tr {% if shift.user_id == current_user_id %}class="table-warning"{% endif %}>
-            <td><strong>{{ shift.date }}</strong></td>
-            <td>
-              <div class="d-flex align-items-center">
-                <img src="/static/uploads/profile_pics/{{ users_map[shift.user_id].profile_pic }}" 
-                     alt="{{ shift.user_name }}" 
-                     class="rounded-circle me-2" 
-                     style="width: 32px; height: 32px; object-fit: cover;"
-                     onerror="this.src='/static/uploads/profile_pics/default.png'">
-                <span {% if shift.user_id == current_user_id %}class="fw-bold text-danger"{% endif %}>
-                  {{ shift.user_name }}
-                </span>
-              </div>
-            </td>
-            <td>
-              <span class="badge" style="background-color: {% if shift.shift_code == 'A' %}#0d6efd{% elif shift.shift_code == 'B' %}#198754{% elif shift.shift_code == 'C' %}#ffc107{% elif shift.shift_code == 'G' %}#6f42c1{% else %}#0dcaf0{% endif %}; color: white;">
-                {{ shift.shift_code }}
-              </span>
-            </td>
-            <td>{{ shift.start_time }} - {{ shift.end_time }}</td>
-            <td>{{ projects_map.get(shift.project_id, 'General') if shift.project_id else 'General' }}</td>
-            <td>{{ shift.task or '-' }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+
+    <!-- Calendar -->
+    <div class="card p-3 mb-4">
+        <h5 class="fw-bold"><i class="fas fa-calendar-alt me-2"></i>Calendar View</h5>
+        <div id="allMembersCalendar" style="min-height: 600px;"></div>
     </div>
-    {% else %}
-    <div class="text-center py-5">
-      <p class="text-muted">No shifts found for the selected date range.</p>
+
+    <!-- List View -->
+    <div class="card p-3 mb-4">
+        <h5 class="fw-bold"><i class="fas fa-list me-2"></i>List View</h5>
+
+        <div class="table-responsive">
+            <table class="table table-hover">
+                <thead class="table-light">
+                    <tr>
+                        <th>Date</th>
+                        <th>Member</th>
+                        <th>Shift</th>
+                        <th>Project</th>
+                        <th>Task</th>
+                    </tr>
+                </thead>
+
+                <tbody>
+                    {% for shift in all_shifts %}
+                    <tr {% if shift.user_id == current_user_id %}class="table-warning"{% endif %}>
+                        <td>{{ shift.date }}</td>
+                        <td>{{ shift.user_name }}</td>
+                        <td>{{ shift.shift_code }}</td>
+                        <td>{{ projects_map.get(shift.project_id, 'General') }}</td>
+                        <td>{{ shift.task or '-' }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+
+            </table>
+        </div>
     </div>
-    {% endif %}
-  </div>
+
 </div>
 
-<script>
-// Shift colors for reference
-const SHIFT_COLORS = {
-  "A": "#0d6efd",
-  "B": "#198754",
-  "C": "#ffc107",
-  "G": "#6f42c1"
-};
-</script>
 {% endblock %}
 
 {% block scripts %}
+
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const calendarEl = document.getElementById('allMembersCalendar');
-  const currentUserId = "{{ current_user_id }}";
-  
-  // Using the working API endpoint - no need for date filters for now
-  
-  // Initialize calendar
-  const isMobile = window.innerWidth < 768;
-  const calendar = new FullCalendar.Calendar(calendarEl, {
-    initialView: isMobile ? 'dayGridMonth' : 'timeGridWeek',
-    height: 'auto',
-    headerToolbar: {
-      left: 'prev,next today',
-      center: 'title',
-      right: 'dayGridMonth,timeGridWeek,timeGridDay'
-    },
-    slotMinTime: '06:00:00',
-    slotMaxTime: '23:00:00',
-    expandRows: true,
-    nowIndicator: true,
-    editable: false,
-    events: function(fetchInfo, successCallback, failureCallback) {
-      // Use the EXACT same working API as dashboard calendar
-      fetch("/member/api/all_team_shifts")
-        .then(response => {
-          if (!response.ok) {
-            throw new Error('Network response was not ok');
-          }
-          return response.json();
-        })
-        .then(data => {
-          console.log('All members shifts loaded:', data.length, 'events');
-          successCallback(data);
-        })
-        .catch(err => {
-          console.error('Error loading shifts:', err);
-          failureCallback(err);
-        });
-    },
-    eventDidMount: function(info) {
-      const props = info.event.extendedProps || {};
-      const isMyShift = props.is_my_shift === true;
-      
-      // Add tooltip
-      if (props.tooltip) {
-        info.el.title = props.tooltip;
-      }
-      
-      // Highlight own shifts
-      if (isMyShift) {
-        info.el.style.fontWeight = 'bold';
-        info.el.style.boxShadow = '0 0 8px rgba(255, 0, 0, 0.5)';
-      }
-      
-      // Add profile picture
-      const profilePic = props.profile_pic || 'default.png';
-      const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
-      const img = document.createElement('img');
-      img.src = profilePicUrl;
-      img.style.width = '24px';
-      img.style.height = '24px';
-      img.style.borderRadius = '50%';
-      img.style.objectFit = 'cover';
-      img.style.marginRight = '6px';
-      img.style.verticalAlign = 'middle';
-      img.onerror = function() {
-        this.src = '/static/uploads/profile_pics/default.png';
-      };
-      if (info.el.querySelector('.fc-event-title')) {
-        info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
-      } else {
-        info.el.insertBefore(img, info.el.firstChild);
-      }
-    },
-    eventClick: function(info) {
-      const props = info.event.extendedProps || {};
-      const message = `Shift Details:\n\n` +
-        `Member: ${props.user || 'Unknown'}\n` +
-        `Project: ${props.project || 'General'}\n` +
-        `Shift: ${props.shift_code || 'N/A'}\n` +
-        `Task: ${props.task || 'None'}\n` +
-        `Time: ${info.event.start.toLocaleTimeString()} - ${info.event.end.toLocaleTimeString()}`;
-      alert(message);
-    }
-  });
-  
-  calendar.render();
-  
-  // Filter function
-  window.filterShifts = function() {
-    calendar.refetchEvents();
-    // Reload page to update list view
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const params = new URLSearchParams();
-    if (startDate) params.append('start_date', startDate);
-    if (endDate) params.append('end_date', endDate);
-    window.location.href = '/member/all-members-shifts?' + params.toString();
-  };
-  
-  // Export function
-  window.exportShifts = function() {
-    const startDate = document.getElementById('startDate').value;
-    const endDate = document.getElementById('endDate').value;
-    const params = new URLSearchParams();
-    if (startDate) params.append('start_date', startDate);
-    if (endDate) params.append('end_date', endDate);
-    window.open('/member/api/all_members_planned_shifts?' + params.toString(), '_blank');
-  };
+document.addEventListener("DOMContentLoaded", function () {
+    const calendarEl = document.getElementById("allMembersCalendar");
+
+    const calendar = new FullCalendar.Calendar(calendarEl, {
+        initialView: window.innerWidth < 768 ? "dayGridMonth" : "timeGridWeek",
+        height: "auto",
+        headerToolbar: {
+            left: "prev,next today",
+            center: "title",
+            right: "dayGridMonth,timeGridWeek,timeGridDay"
+        },
+        nowIndicator: true,
+
+        eventSources: [{
+            url: "/member/api/all_members_planned_shifts",
+            method: "GET",
+            failure: () => alert("Error loading shifts")
+        }],
+
+        eventDidMount: function(info) {
+            // CLEAN version — no profile pictures, no icons
+            if (info.event.extendedProps.tooltip) {
+                info.el.title = info.event.extendedProps.tooltip;
+            }
+        }
+    });
+
+    calendar.render();
+
+    window.filterShifts = function () {
+        const start = document.getElementById("startDate").value;
+        const end = document.getElementById("endDate").value;
+
+        const params = new URLSearchParams();
+        if (start) params.append("start_date", start);
+        if (end) params.append("end_date", end);
+
+        window.location.href = "/member/all-members-shifts?" + params.toString();
+    };
 });
 </script>
-{% endblock %}
 
+{% endblock %}

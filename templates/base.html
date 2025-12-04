@@ -11,31 +11,42 @@
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
   <!-- Bootstrap -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css"
-    rel="stylesheet">
+  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/css/bootstrap.min.css" rel="stylesheet">
 
-  <!-- FullCalendar (global build) -->
-  <link
-    href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css"
-    rel="stylesheet">
+  <!-- FullCalendar -->
+  <link href="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.css" rel="stylesheet">
 
   <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
 
+  <!-- Custom CSS -->
   <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+
+  <!-- ========================= PWA SUPPORT ========================= -->
+  <link rel="manifest" href="/static/manifest.json">
+  <meta name="theme-color" content="#b44cff">
+
+  <!-- iOS Install Support -->
+  <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black">
 </head>
+
 <body>
 
+<!-- ========================= NAVBAR ========================= -->
 <nav class="navbar navbar-expand-lg navbar-dark mb-4">
   <div class="container-fluid">
     <a class="navbar-brand fw-bold" href="/">
       <i class="fas fa-calendar-alt me-2"></i>Shift Planner
     </a>
+
     <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav">
       <span class="navbar-toggler-icon"></span>
     </button>
+
     <div class="collapse navbar-collapse" id="navbarNav">
+
       <ul class="navbar-nav me-auto">
         {% if session.get('role') == 'manager' %}
           <li class="nav-item"><a class="nav-link" href="/manager/dashboard">Dashboard</a></li>
@@ -43,6 +54,7 @@
           <li class="nav-item"><a class="nav-link" href="/manager/change-requests">Change Requests</a></li>
           <li class="nav-item"><a class="nav-link" href="/manager/swap-requests">Swap Requests</a></li>
           <li class="nav-item"><a class="nav-link" href="/project/">Projects</a></li>
+
         {% elif session.get('role') == 'member' %}
           <li class="nav-item"><a class="nav-link" href="/member/dashboard">Dashboard</a></li>
           <li class="nav-item"><a class="nav-link" href="/member/my-schedule">My Schedule</a></li>
@@ -51,6 +63,7 @@
           <li class="nav-item"><a class="nav-link" href="/member/request-swap">Request Swap</a></li>
         {% endif %}
       </ul>
+
       <ul class="navbar-nav">
         {% if session.get('user_id') %}
           <li class="nav-item">
@@ -63,44 +76,41 @@
             </span>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/logout">
-              <i class="fas fa-sign-out-alt me-2"></i>Logout
-            </a>
+            <a class="nav-link" href="/logout"><i class="fas fa-sign-out-alt me-2"></i>Logout</a>
           </li>
         {% else %}
           <li class="nav-item">
-            <a class="nav-link" href="/login">
-              <i class="fas fa-sign-in-alt me-2"></i>Login
-            </a>
+            <a class="nav-link" href="/login"><i class="fas fa-sign-in-alt me-2"></i>Login</a>
           </li>
           <li class="nav-item">
-            <a class="nav-link" href="/register">
-              <i class="fas fa-user-plus me-2"></i>Register
-            </a>
+            <a class="nav-link" href="/register"><i class="fas fa-user-plus me-2"></i>Register</a>
           </li>
         {% endif %}
       </ul>
+
     </div>
   </div>
 </nav>
 
-<div class="container mb-5 animate-fade-in">
+<!-- ========================= CONTENT WRAPPER ========================= -->
+
+{% set calendar_pages = [
+    '/member/dashboard',
+    '/member/my-schedule',
+    '/member/all-members-shifts',
+    '/manager/dashboard',
+    '/manager/manage-shifts'
+] %}
+
+<div class="container mb-5 {% if request.path not in calendar_pages %}animate-fade-in{% endif %}">
+
+  <!-- Flash Messages -->
   {% with messages = get_flashed_messages(with_categories=true) %}
     {% if messages %}
       <div class="mt-3">
         {% for category, message in messages %}
-          <div class="alert alert-{{ category }} alert-dismissible fade show animate-slide-in-right" role="alert">
-            {% if category == 'success' %}
-              {% set icon_name = 'check-circle' %}
-            {% elif category == 'danger' %}
-              {% set icon_name = 'exclamation-circle' %}
-            {% elif category == 'warning' %}
-              {% set icon_name = 'exclamation-triangle' %}
-            {% else %}
-              {% set icon_name = 'info-circle' %}
-            {% endif %}
-            <i class="fas fa-{{ icon_name }} me-2"></i>
-            {{ message }}
+          <div class="alert alert-{{ category }} alert-dismissible fade show animate-slide-in-right">
+            <i class="fas fa-info-circle me-2"></i>{{ message }}
             <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
           </div>
         {% endfor %}
@@ -111,125 +121,26 @@
   {% block content %}{% endblock %}
 </div>
 
+<!-- ========================= SCRIPTS ========================= -->
 <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.3/dist/js/bootstrap.bundle.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/fullcalendar@6.1.15/index.global.min.js"></script>
 
 <script>
-// Auto-dismiss flash messages
+/* Auto-Dismiss Flash Messages */
 document.addEventListener('DOMContentLoaded', function() {
-  const alerts = document.querySelectorAll('.alert');
-  alerts.forEach(function(alert) {
-    const category = alert.classList.contains('alert-success') ? 'success' :
-                     alert.classList.contains('alert-info') ? 'info' :
-                     alert.classList.contains('alert-warning') ? 'warning' : 'danger';
-    
-    // Auto-dismiss success messages after 5 seconds
-    if (category === 'success') {
-      setTimeout(function() {
-        const bsAlert = new bootstrap.Alert(alert);
-        bsAlert.close();
-      }, 5000);
-    }
-    // Auto-dismiss info messages after 7 seconds
-    else if (category === 'info') {
-      setTimeout(function() {
-        const bsAlert = new bootstrap.Alert(alert);
-        bsAlert.close();
-      }, 7000);
-    }
-    // Keep danger and warning messages until manually dismissed
-  });
-
-  // Client-side form validation
-  const forms = document.querySelectorAll('form[method="post"]');
-  forms.forEach(function(form) {
-    form.addEventListener('submit', function(e) {
-      let isValid = true;
-      const requiredFields = form.querySelectorAll('[required]');
-      const errorMessages = [];
-
-      // Clear previous error messages
-      form.querySelectorAll('.invalid-feedback').forEach(function(el) {
-        el.remove();
-      });
-      form.querySelectorAll('.is-invalid').forEach(function(el) {
-        el.classList.remove('is-invalid');
-      });
-
-      requiredFields.forEach(function(field) {
-        const value = field.value.trim();
-        
-        // Check if field is empty
-        if (!value) {
-          isValid = false;
-          field.classList.add('is-invalid');
-          const feedback = document.createElement('div');
-          feedback.className = 'invalid-feedback';
-          feedback.textContent = 'This field is required.';
-          field.parentNode.appendChild(feedback);
-        }
-        
-        // Validate date fields (prevent past dates for shift creation)
-        if (field.type === 'date' && value) {
-          const selectedDate = new Date(value);
-          const today = new Date();
-          today.setHours(0, 0, 0, 0);
-          
-          // For shift creation forms, prevent past dates
-          if (form.querySelector('input[name="date"]') && selectedDate < today) {
-            isValid = false;
-            field.classList.add('is-invalid');
-            const feedback = document.createElement('div');
-            feedback.className = 'invalid-feedback';
-            feedback.textContent = 'Cannot select a past date.';
-            field.parentNode.appendChild(feedback);
-          }
-        }
-        
-        // Validate email fields
-        if (field.type === 'email' && value) {
-          const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-          if (!emailRegex.test(value)) {
-            isValid = false;
-            field.classList.add('is-invalid');
-            const feedback = document.createElement('div');
-            feedback.className = 'invalid-feedback';
-            feedback.textContent = 'Please enter a valid email address.';
-            field.parentNode.appendChild(feedback);
-          }
-        }
-      });
-
-      if (!isValid) {
-        e.preventDefault();
-        e.stopPropagation();
-        
-        // Show error message at top of form
-        let errorAlert = form.querySelector('.form-validation-error');
-        if (!errorAlert) {
-          errorAlert = document.createElement('div');
-          errorAlert.className = 'alert alert-danger form-validation-error mb-3';
-          errorAlert.innerHTML = '<i class="fas fa-exclamation-circle me-2"></i>Please fix the errors below before submitting.';
-          form.insertBefore(errorAlert, form.firstChild);
-        }
-        
-        // Scroll to first error
-        const firstError = form.querySelector('.is-invalid');
-        if (firstError) {
-          firstError.scrollIntoView({ behavior: 'smooth', block: 'center' });
-          firstError.focus();
-        }
-      } else {
-        // Disable submit button to prevent double submission
-        const submitBtn = form.querySelector('button[type="submit"]');
-        if (submitBtn) {
-          submitBtn.disabled = true;
-          submitBtn.innerHTML = '<span class="spinner-border spinner-border-sm me-2"></span>Processing...';
-        }
-      }
-    });
+  document.querySelectorAll('.alert-success').forEach(el => {
+    setTimeout(() => new bootstrap.Alert(el).close(), 5000);
   });
 });
+</script>
+
+<!-- ========================= REGISTER SERVICE WORKER ========================= -->
+<script>
+if ("serviceWorker" in navigator) {
+  navigator.serviceWorker.register("/static/sw.js")
+    .then(() => console.log("PWA Active — Service Worker registered"))
+    .catch(err => console.error("Service Worker Failed:", err));
+}
 </script>
 
 {% block scripts %}{% endblock %}

@@ -4,7 +4,15 @@
 <div class="animate-fade-in-up">
   <div class="d-flex justify-content-between align-items-center mb-4">
     <div>
-      <h2 class="mb-1" style="font-weight: 700; background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;">Manager Dashboard</h2>
+      <h2 class="mb-1"
+          style="
+            font-weight: 700;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;">
+        Manager Dashboard
+      </h2>
       <p class="text-muted mb-0">Overview of your shift management system</p>
     </div>
   </div>
@@ -16,18 +24,21 @@
         <h3>{{ users_count }}</h3>
       </div>
     </div>
+
     <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.2s;">
       <div class="stat-card stat-card-success">
         <h6>Total Shifts</h6>
         <h3>{{ shifts_count }}</h3>
       </div>
     </div>
+
     <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.3s;">
       <div class="stat-card stat-card-info">
         <h6>Total Projects</h6>
         <h3>{{ project_count }}</h3>
       </div>
     </div>
+
     <div class="col-md-3 animate-fade-in-up" style="animation-delay: 0.4s;">
       <div class="stat-card stat-card-warning">
         <h6>Pending Requests</h6>
@@ -37,204 +48,142 @@
   </div>
 </div>
 
-<div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay: 0.5s;">
-  <div class="d-flex flex-wrap gap-2 justify-content-between align-items-center mb-4">
+<div class="glass-card p-4 mb-4 animate-fade-in-up" style="animation-delay:0.5s;">
+  <div class="d-flex flex-wrap justify-content-between align-items-center mb-4">
     <div>
-      <h4 class="mb-1" style="font-weight: 700; color: #2d3748;">Team Schedule</h4>
-      <p class="text-muted mb-0 small">Visualize and manage all team shifts</p>
+      <h4 class="mb-1 fw-bold" style="color:#eae4ff;">Team Schedule</h4>
+      <p class="text-muted small mb-0">Visualize and manage all team shifts</p>
     </div>
+
     <div class="d-flex flex-wrap gap-2">
-      <a href="/manager/upload-excel" class="btn btn-sm btn-success">
-        📤 Upload/Copy-Paste Shifts
-      </a>
-      <a href="/manager/export/csv" class="btn btn-sm btn-outline-success">
-        📊 Export CSV
-      </a>
-      <a href="/manager/export/print" target="_blank" class="btn btn-sm btn-outline-secondary">
-🖨️ Print PDF
-      </a>
-      <a href="/project/create" class="btn btn-sm btn-primary">
-        ➕ New Project
-      </a>
+      <a href="/manager/upload-excel" class="btn btn-sm btn-success">📤 Upload Shifts</a>
+      <a href="/manager/export/csv" class="btn btn-sm btn-outline-success">📊 Export CSV</a>
+      <a href="/manager/export/print" target="_blank" class="btn btn-sm btn-outline-secondary">🖨️ Print PDF</a>
+      <a href="/project/create" class="btn btn-sm btn-primary">➕ New Project</a>
     </div>
   </div>
 
   <form class="row g-3 mb-4" method="post" action="/manager/auto-roster">
     <div class="col-md-3 col-6">
       <label class="form-label fw-semibold">Start Date</label>
-      <input type="date" name="start_date" class="form-control" required>
+      <input type="date" name="start_date" required class="form-control">
     </div>
+
     <div class="col-md-3 col-6">
       <label class="form-label fw-semibold">End Date</label>
-      <input type="date" name="end_date" class="form-control" required>
+      <input type="date" name="end_date" required class="form-control">
     </div>
+
     <div class="col-md-3 col-6">
       <label class="form-label fw-semibold">Project</label>
       <select name="project_id" class="form-select">
         <option value="">General</option>
         {% for p in projects %}
-        <option value="{{ p._id }}">{{ p.name }}</option>
+          <option value="{{ p._id }}">{{ p.name }}</option>
         {% endfor %}
       </select>
     </div>
+
     <div class="col-md-3 col-6 d-flex align-items-end">
       <button class="btn btn-primary w-100">✨ Auto-generate Roster</button>
     </div>
   </form>
 
   <div class="shift-legend mb-4">
-  <div class="shift-legend-item">
-    <span class="shift-legend-color" style="background-color: #0d6efd;"></span>
-    <small><strong>Shift A</strong></small>
+    <div class="shift-legend-item">
+      <span class="shift-legend-color shift-A"></span> <small>Shift A</small>
+    </div>
+    <div class="shift-legend-item">
+      <span class="shift-legend-color shift-B"></span> <small>Shift B</small>
+    </div>
+    <div class="shift-legend-item">
+      <span class="shift-legend-color shift-C"></span> <small>Shift C</small>
+    </div>
+    <div class="shift-legend-item">
+      <span class="shift-legend-color shift-G"></span> <small>Shift G</small>
+    </div>
   </div>
-  <div class="shift-legend-item">
-    <span class="shift-legend-color" style="background-color: #198754;"></span>
-    <small><strong>Shift B</strong></small>
-  </div>
-  <div class="shift-legend-item">
-    <span class="shift-legend-color" style="background-color: #ffc107;"></span>
-    <small><strong>Shift C</strong></small>
-  </div>
-  <div class="shift-legend-item">
-    <span class="shift-legend-color" style="background-color: #6f42c1;"></span>
-    <small><strong>Shift G</strong></small>
-  </div>
-</div>
 
-  <div class="row mb-4">
+  <div class="row mb-3">
     <div class="col-md-4">
       <label class="form-label fw-semibold">Filter by Project</label>
       <select id="projectFilter" class="form-select">
         <option value="">All Projects</option>
         {% for p in projects %}
-        <option value="{{ p._id }}">{{ p.name }}</option>
+          <option value="{{ p._id }}">{{ p.name }}</option>
         {% endfor %}
       </select>
     </div>
   </div>
 </div>
 
-<div class="glass-card p-3 mb-3 animate-fade-in-up" style="animation-delay: 0.6s;">
-  <p class="mb-0 text-center">
-    <span class="badge" style="background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%); color: white;">💡 Tip</span>
-    <span class="ms-2">Click on any shift in the calendar to <strong>edit</strong> its time, user, project or task. You can also drag and resize events to adjust timings.</span>
-  </p>
-</div>
+<div id="managerCalendar" class="glass-card p-4 animate-fade-in-up"
+     style="min-height:650px; animation-delay:0.7s;"></div>
 
-<div id="managerCalendar" class="animate-fade-in-up" style="min-height: 600px; animation-delay: 0.7s;"></div>
 {% endblock %}
 
 {% block scripts %}
 <script>
-document.addEventListener('DOMContentLoaded', function() {
-  const calendarEl = document.getElementById('managerCalendar');
-  const projectFilter = document.getElementById('projectFilter');
+document.addEventListener("DOMContentLoaded", function () {
 
-  const editUrlTemplate = "/manager/edit-shift/__ID__";
+  const calendarEl = document.getElementById("managerCalendar");
+  const projectFilter = document.getElementById("projectFilter");
+
+  const SHIFT_COLORS = {
+    A: "#4c6aff",
+    B: "#2dd67b",
+    C: "#ffe14c",
+    G: "#b54cff"
+  };
 
   function buildCalendar(initialView) {
     return new FullCalendar.Calendar(calendarEl, {
       initialView: initialView,
-      height: 'auto',
-      slotMinTime: '06:00:00',
-      slotMaxTime: '23:00:00',
+      height: "auto",
+      slotMinTime: "06:00:00",
+      slotMaxTime: "23:00:00",
       expandRows: true,
       nowIndicator: true,
       editable: true,
-      eventDurationEditable: true,
       headerToolbar: {
-        left: 'prev,next today',
-        center: 'title',
-        right: 'dayGridMonth,timeGridWeek,timeGridDay'
+        left: "prev,next today",
+        center: "title",
+        right: "dayGridMonth,timeGridWeek,timeGridDay"
       },
-      events: function(fetchInfo, successCallback, failureCallback) {
+
+      events: function(fetchInfo, success, fail) {
         const params = new URLSearchParams();
-        const projectId = projectFilter.value;
-        if (projectId) {
-          params.append('project_id', projectId);
-        }
-        fetch("/manager/api/shifts?" + params.toString())
-          .then(response => response.json())
-          .then(data => successCallback(data))
-          .catch(err => failureCallback(err));
+        if (projectFilter.value) params.append("project_id", projectFilter.value);
+
+        fetch("/manager/api/shifts?" + params)
+          .then(r => r.json())
+          .then(data => success(data))
+          .catch(err => fail(err));
       },
+
+      eventDidMount: function(info) {
+        const s = info.event.extendedProps.shift_code;
+        info.el.style.backgroundColor = SHIFT_COLORS[s] || "#999";
+        info.el.style.borderColor = "#000";
+        info.el.style.color = "#000";
+        info.el.style.fontWeight = "600";
+        info.el.style.boxShadow = "0 0 8px rgba(255,255,255,0.2)";
+      },
+
       eventClick: function(info) {
         const shiftId = info.event.extendedProps.shift_id;
         if (shiftId) {
-          const url = editUrlTemplate.replace('__ID__', shiftId);
-          window.location.href = url;
+          window.location.href = `/manager/edit-shift/${shiftId}`;
         }
-      },
-      eventDidMount: function(info) {
-        if (info.event.extendedProps.tooltip) {
-          info.el.title = info.event.extendedProps.tooltip;
-        }
-        // Add profile picture to event
-        const profilePic = info.event.extendedProps.profile_pic || 'default.png';
-        const profilePicUrl = `/static/uploads/profile_pics/${profilePic}`;
-        const img = document.createElement('img');
-        img.src = profilePicUrl;
-        img.style.width = '24px';
-        img.style.height = '24px';
-        img.style.borderRadius = '50%';
-        img.style.objectFit = 'cover';
-        img.style.marginRight = '6px';
-        img.style.verticalAlign = 'middle';
-        img.onerror = function() {
-          this.src = '/static/uploads/profile_pics/default.png';
-        };
-        if (info.el.querySelector('.fc-event-title')) {
-          info.el.querySelector('.fc-event-title').insertBefore(img, info.el.querySelector('.fc-event-title').firstChild);
-        } else {
-          info.el.insertBefore(img, info.el.firstChild);
-        }
-      },
-      eventDrop: function(info) {
-        saveShiftMove(info);
-      },
-      eventResize: function(info) {
-        saveShiftMove(info);
       }
     });
   }
 
   const isMobile = window.innerWidth < 768;
-  let calendar = buildCalendar(isMobile ? 'dayGridMonth' : 'timeGridWeek');
+  let calendar = buildCalendar(isMobile ? "dayGridMonth" : "timeGridWeek");
   calendar.render();
 
-  projectFilter.addEventListener('change', function() {
-    calendar.refetchEvents();
-  });
-
-  // Auto-refresh calendar after import
-  {% if request.args.get('imported') == '1' %}
-  setTimeout(function() {
-    if (typeof calendar !== 'undefined') {
-      calendar.refetchEvents();
-      console.log('Calendar refreshed after import');
-    }
-  }, 500);
-  {% endif %}
-
-  function saveShiftMove(info) {
-    fetch("/manager/api/update-shift", {
-      method: "POST",
-      headers: {"Content-Type": "application/json"},
-      body: JSON.stringify({
-        id: info.event.id,
-        start: info.event.start.toISOString(),
-        end: (info.event.end || info.event.start).toISOString()
-      })
-    }).then(res => res.json()).then(data => {
-      if (!data.success) {
-        alert("Failed to save move: " + (data.error || "Unknown error"));
-        info.revert();
-      }
-    }).catch(err => {
-      alert("Error saving move");
-      info.revert();
-    });
-  }
+  projectFilter.addEventListener("change", () => calendar.refetchEvents());
 });
 </script>
 {% endblock %}
