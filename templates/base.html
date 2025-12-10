@@ -25,11 +25,14 @@
   <!-- ========================= PWA SUPPORT ========================= -->
   <link rel="manifest" href="/static/manifest.json">
   <meta name="theme-color" content="#b44cff">
+  <meta name="description" content="Shift & Task Scheduler - Manage your team shifts and schedules">
+  <meta name="mobile-web-app-capable" content="yes">
 
   <!-- iOS Install Support -->
   <link rel="apple-touch-icon" href="/static/icons/icon-192.png">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
+  <meta name="apple-mobile-web-app-title" content="Shift Planner">
 </head>
 
 <body>
@@ -53,6 +56,8 @@
           <li class="nav-item"><a class="nav-link" href="/manager/manage-shifts">Manage Shifts</a></li>
           <li class="nav-item"><a class="nav-link" href="/manager/change-requests">Change Requests</a></li>
           <li class="nav-item"><a class="nav-link" href="/manager/swap-requests">Swap Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/leave-requests">Leave/Weekoff Requests</a></li>
+          <li class="nav-item"><a class="nav-link" href="/manager/assign-weekoff-leave">Assign Weekoff/Leave</a></li>
           <li class="nav-item"><a class="nav-link" href="/project/">Projects</a></li>
 
         {% elif session.get('role') == 'member' %}
@@ -61,6 +66,8 @@
           <li class="nav-item"><a class="nav-link" href="/member/all-members-shifts">All Members Shifts</a></li>
           <li class="nav-item"><a class="nav-link" href="/member/request-change">Request Change</a></li>
           <li class="nav-item"><a class="nav-link" href="/member/request-swap">Request Swap</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/request-weekoff">Request Weekoff</a></li>
+          <li class="nav-item"><a class="nav-link" href="/member/request-leave">Request Leave</a></li>
         {% endif %}
       </ul>
 
@@ -136,11 +143,85 @@ document.addEventListener('DOMContentLoaded', function() {
 
 <!-- ========================= REGISTER SERVICE WORKER ========================= -->
 <script>
+// Register Service Worker for PWA
 if ("serviceWorker" in navigator) {
-  navigator.serviceWorker.register("/static/sw.js")
-    .then(() => console.log("PWA Active — Service Worker registered"))
-    .catch(err => console.error("Service Worker Failed:", err));
+  window.addEventListener("load", () => {
+    navigator.serviceWorker.register("/static/sw.js")
+      .then((registration) => {
+        console.log("PWA Active — Service Worker registered:", registration.scope);
+      })
+      .catch((err) => {
+        console.error("Service Worker Failed:", err);
+      });
+  });
 }
+
+// PWA Install Prompt
+let deferredPrompt;
+let installButton = null;
+
+window.addEventListener('beforeinstallprompt', (e) => {
+  // Prevent the mini-infobar from appearing on mobile
+  e.preventDefault();
+  // Stash the event so it can be triggered later
+  deferredPrompt = e;
+  // Show install button if needed
+  showInstallButton();
+});
+
+// Show install button function
+function showInstallButton() {
+  // Check if already installed
+  if (window.matchMedia('(display-mode: standalone)').matches) {
+    return; // Already installed
+  }
+  
+  // Create install button if it doesn't exist
+  if (!installButton && deferredPrompt) {
+    installButton = document.createElement('button');
+    installButton.className = 'btn btn-primary btn-sm position-fixed';
+    installButton.style.cssText = 'bottom: 20px; right: 20px; z-index: 1000; box-shadow: 0 4px 6px rgba(0,0,0,0.3);';
+    installButton.innerHTML = '<i class="fas fa-download me-2"></i>Install App';
+    installButton.onclick = installApp;
+    document.body.appendChild(installButton);
+  }
+}
+
+// Install app function
+async function installApp() {
+  if (!deferredPrompt) {
+    return;
+  }
+  
+  // Show the install prompt
+  deferredPrompt.prompt();
+  
+  // Wait for the user to respond to the prompt
+  const { outcome } = await deferredPrompt.userChoice;
+  
+  if (outcome === 'accepted') {
+    console.log('User accepted the install prompt');
+    if (installButton) {
+      installButton.remove();
+      installButton = null;
+    }
+  } else {
+    console.log('User dismissed the install prompt');
+  }
+  
+  // Clear the deferredPrompt
+  deferredPrompt = null;
+}
+
+// Hide install button if app is already installed
+window.addEventListener('appinstalled', () => {
+  console.log('PWA was installed');
+  if (installButton) {
+    installButton.remove();
+    installButton = null;
+  }
+  deferredPrompt = null;
+});
 </script>
 
 {% block scripts %}{% endblock %}

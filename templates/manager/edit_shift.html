@@ -28,6 +28,12 @@
             <option value="G" {% if shift.shift_code == 'G' %}selected{% endif %}>
               G (09:00 – 17:30)
             </option>
+            <option value="W" {% if shift.shift_code == 'W' %}selected{% endif %}>
+              W (Weekoff - All Day)
+            </option>
+            <option value="L" {% if shift.shift_code == 'L' %}selected{% endif %}>
+              L (Leave - All Day)
+            </option>
           </select>
         </div>
 

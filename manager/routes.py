@@ -102,6 +102,8 @@ SHIFT_COLORS = {
     "B": "#198754",  # green
     "C": "#ffc107",  # yellow
     "G": "#6f42c1",  # purple
+    "W": "#6c757d",  # gray (weekoff)
+    "L": "#dc3545",  # red (leave)
 }
 
 # OFFICIAL SHIFT TIMINGS (24-hour format)
@@ -110,6 +112,8 @@ SHIFT_TIMINGS = {
     "B": ("14:00", "22:30"),  # 2 PM → 10:30 PM
     "C": ("22:00", "06:00"),  # 10 PM → 6 AM NEXT DAY
     "G": ("09:00", "17:30"),  # 9 AM → 5:30 PM
+    "W": ("00:00", "23:59"),  # Weekoff - all day
+    "L": ("00:00", "23:59"),  # Leave - all day
 }
 
 
@@ -266,9 +270,13 @@ def api_shifts():
                 start = f"{date_str}T{start_time}:00"
 
                 # Night shift: C → end next day
+                # Weekoff/Leave: all day events
                 if shift_code == "C":
                     end_date = date_obj + timedelta(days=1)
                     end = f"{end_date.isoformat()}T{end_time}:00"
+                elif shift_code in ["W", "L"]:
+                    # All day event for weekoff/leave
+                    end = f"{date_str}T{end_time}:00"
                 else:
                     end = f"{date_str}T{end_time}:00"
 
@@ -282,16 +290,19 @@ def api_shifts():
                 task = s.get("task", "")
 
                 color = SHIFT_COLORS.get(shift_code, "#0dcaf0")
-                tooltip = f"{user_name} • {project_name} • {shift_code} • {task}"
+                shift_label = "Weekoff" if shift_code == "W" else ("Leave" if shift_code == "L" else shift_code)
+                tooltip = f"{user_name} • {project_name} • {shift_label} • {task}"
 
+                shift_label = "Weekoff" if shift_code == "W" else ("Leave" if shift_code == "L" else shift_code)
                 events.append(
                     {
                         "id": str(s["_id"]),
-                        "title": f"{project_name}: {user_name} – {shift_code}",
+                        "title": f"{project_name}: {user_name} – {shift_label}",
                         "start": start,
                         "end": end,
                         "backgroundColor": color,
                         "borderColor": color,
+                        "allDay": shift_code in ["W", "L"],  # All day for weekoff/leave
                         "extendedProps": {
                             "shift_id": str(s["_id"]),
                             "user": user_name,
@@ -1016,8 +1027,8 @@ def upload_excel():
                         
                         # Validate shift code
                         shift_code = str(shift_val).strip().upper()
-                        if shift_code not in ["A", "B", "C", "G"]:
-                            errors.append(f"Row {row_idx}: Invalid shift code '{shift_code}'. Must be A, B, C, or G")
+                        if shift_code not in ["A", "B", "C", "G", "W", "L"]:
+                            errors.append(f"Row {row_idx}: Invalid shift code '{shift_code}'. Must be A, B, C, G, W (Weekoff), or L (Leave)")
                             error_count += 1
                             continue
                         
@@ -1654,6 +1665,191 @@ def swap_requests():
         "manager/swap_requests.html",
         requests=requests,
         users_map=users_map,
+    )
+
+
+# =========================================================
+# LEAVE & WEEKOFF REQUESTS
+# =========================================================
+@manager_bp.route("/leave-requests", methods=["GET", "POST"], endpoint="leave_requests")
+@manager_required
+def leave_requests():
+    if request.method == "POST":
+        req_id = request.form.get("req_id")
+        action = request.form.get("action")
+
+        if not req_id or not action:
+            flash("Invalid request.", "danger")
+            return redirect(url_for("manager.leave_requests"))
+
+        req = mongo.db.leave_requests.find_one({"_id": ObjectId(req_id)})
+        if not req:
+            flash("Request not found.", "danger")
+            return redirect(url_for("manager.leave_requests"))
+
+        if action == "approve":
+            # Create shift entry for weekoff/leave
+            shift_code = "W" if req["type"] == "weekoff" else "L"
+            start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("00:00", "23:59"))
+            
+            # Check if shift already exists
+            existing_shift = mongo.db.shifts.find_one({
+                "date": req["date"],
+                "user_id": req["user_id"]
+            })
+            
+            if existing_shift:
+                # Update existing shift to weekoff/leave
+                mongo.db.shifts.update_one(
+                    {"_id": existing_shift["_id"]},
+                    {
+                        "$set": {
+                            "shift_code": shift_code,
+                            "start_time": start_time,
+                            "end_time": end_time,
+                            "updated_at": datetime.utcnow(),
+                        }
+                    }
+                )
+            else:
+                # Create new shift entry
+                mongo.db.shifts.insert_one({
+                    "date": req["date"],
+                    "user_id": req["user_id"],
+                    "shift_code": shift_code,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "task": f"{req['type'].title()} - {req.get('reason', '')}",
+                    "project_id": None,
+                    "created_at": datetime.utcnow(),
+                    "updated_at": datetime.utcnow(),
+                })
+            
+            # Update request status
+            mongo.db.leave_requests.update_one(
+                {"_id": ObjectId(req_id)},
+                {"$set": {"status": "approved", "updated_at": datetime.utcnow()}}
+            )
+            
+            # Send notification
+            mongo.db.notifications.insert_one({
+                "user_id": req["user_id"],
+                "message": f"Your {req['type']} request for {req['date']} has been approved.",
+                "created_at": datetime.utcnow(),
+                "read": False,
+            })
+            
+            flash(f"{req['type'].title()} request approved and assigned.", "success")
+
+        elif action == "reject":
+            mongo.db.leave_requests.update_one(
+                {"_id": ObjectId(req_id)},
+                {"$set": {"status": "rejected", "updated_at": datetime.utcnow()}}
+            )
+            
+            mongo.db.notifications.insert_one({
+                "user_id": req["user_id"],
+                "message": f"Your {req['type']} request for {req['date']} has been rejected.",
+                "created_at": datetime.utcnow(),
+                "read": False,
+            })
+            
+            flash("Request rejected.", "info")
+
+        return redirect(url_for("manager.leave_requests"))
+
+    # Get all leave/weekoff requests
+    requests = list(mongo.db.leave_requests.find().sort("created_at", -1))
+    users_map = {str(u["_id"]): u["name"] for u in mongo.db.users.find()}
+
+    return render_template(
+        "manager/leave_requests.html",
+        requests=requests,
+        users_map=users_map,
+    )
+
+
+# =========================================================
+# ASSIGN WEEKOFF/LEAVE DIRECTLY (MANAGER)
+# =========================================================
+@manager_bp.route("/assign-weekoff-leave", methods=["GET", "POST"], endpoint="assign_weekoff_leave")
+@manager_required
+def assign_weekoff_leave():
+    if request.method == "POST":
+        user_id = request.form.get("user_id")
+        date_str = request.form.get("date")
+        type_val = request.form.get("type")  # "weekoff" or "leave"
+        reason = request.form.get("reason", "")
+        
+        if not user_id or not date_str or not type_val:
+            flash("Please fill in all required fields.", "danger")
+            return redirect(url_for("manager.assign_weekoff_leave"))
+        
+        if type_val not in ["weekoff", "leave"]:
+            flash("Invalid type. Must be weekoff or leave.", "danger")
+            return redirect(url_for("manager.assign_weekoff_leave"))
+        
+        shift_code = "W" if type_val == "weekoff" else "L"
+        start_time, end_time = SHIFT_TIMINGS.get(shift_code, ("00:00", "23:59"))
+        
+        # Check for existing shift
+        existing_shift = mongo.db.shifts.find_one({
+            "date": date_str,
+            "user_id": ObjectId(user_id)
+        })
+        
+        if existing_shift:
+            # Update existing shift
+            mongo.db.shifts.update_one(
+                {"_id": existing_shift["_id"]},
+                {
+                    "$set": {
+                        "shift_code": shift_code,
+                        "start_time": start_time,
+                        "end_time": end_time,
+                        "task": f"{type_val.title()} - {reason}",
+                        "updated_at": datetime.utcnow(),
+                    }
+                }
+            )
+            flash(f"{type_val.title()} updated successfully.", "success")
+        else:
+            # Create new shift
+            mongo.db.shifts.insert_one({
+                "date": date_str,
+                "user_id": ObjectId(user_id),
+                "shift_code": shift_code,
+                "start_time": start_time,
+                "end_time": end_time,
+                "task": f"{type_val.title()} - {reason}",
+                "project_id": None,
+                "created_at": datetime.utcnow(),
+                "updated_at": datetime.utcnow(),
+            })
+            flash(f"{type_val.title()} assigned successfully.", "success")
+        
+        # Send notification
+        mongo.db.notifications.insert_one({
+            "user_id": ObjectId(user_id),
+            "message": f"You have been assigned {type_val} on {date_str}.",
+            "created_at": datetime.utcnow(),
+            "read": False,
+        })
+        
+        return redirect(url_for("manager.assign_weekoff_leave"))
+    
+    # GET request - show form
+    users = list(mongo.db.users.find({"role": "member"}).sort("name", 1))
+    for u in users:
+        u["_id"] = str(u["_id"])
+    
+    from datetime import date
+    today_date = date.today().isoformat()
+    
+    return render_template(
+        "manager/assign_weekoff_leave.html",
+        users=users,
+        today_date=today_date,
     )
 
 

@@ -1,0 +1,38 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Assign Weekoff / Leave</h3>
+
+<form method="post" class="card p-4 shadow-sm">
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Select Member</label>
+    <select name="user_id" class="form-select" required>
+      <option value="">-- Select Member --</option>
+      {% for u in users %}
+      <option value="{{ u._id }}">{{ u.name }} ({{ u.email }})</option>
+      {% endfor %}
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Date</label>
+    <input type="date" name="date" class="form-control" required min="{{ today_date }}">
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Type</label>
+    <select name="type" class="form-select" required>
+      <option value="">-- Select Type --</option>
+      <option value="weekoff">Weekoff</option>
+      <option value="leave">Leave</option>
+    </select>
+  </div>
+
+  <div class="mb-3">
+    <label class="form-label fw-semibold">Reason (Optional)</label>
+    <textarea name="reason" class="form-control" rows="3" placeholder="Enter reason for weekoff/leave..."></textarea>
+  </div>
+
+  <button type="submit" class="btn btn-primary w-100">Assign Weekoff/Leave</button>
+</form>
+{% endblock %}
+

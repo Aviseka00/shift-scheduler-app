@@ -1,0 +1,64 @@
+{% extends "base.html" %}
+{% block content %}
+<h3 class="mb-3">Leave & Weekoff Requests</h3>
+
+{% if requests %}
+<div class="table-responsive">
+  <table class="table table-bordered align-middle">
+    <thead class="table-light">
+      <tr>
+        <th>User</th>
+        <th>Date</th>
+        <th>Type</th>
+        <th>Reason</th>
+        <th>Status</th>
+        <th>Requested At</th>
+        <th>Actions</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for r in requests %}
+      <tr>
+        <td>{{ users_map[r.user_id|string] }}</td>
+        <td>{{ r.date }}</td>
+        <td>
+          <span class="badge {% if r.type == 'weekoff' %}bg-secondary{% else %}bg-danger{% endif %}">
+            {{ r.type|title }}
+          </span>
+        </td>
+        <td>{{ r.reason or 'N/A' }}</td>
+        <td>
+          <span class="badge 
+            {% if r.status == 'pending' %}bg-warning text-dark
+            {% elif r.status == 'approved' %}bg-success
+            {% else %}bg-danger{% endif %}">
+            {{ r.status|title }}
+          </span>
+        </td>
+        <td>{{ r.created_at.strftime('%Y-%m-%d %H:%M') if r.created_at else 'N/A' }}</td>
+        <td>
+          {% if r.status == 'pending' %}
+          <form method="post" class="d-inline">
+            <input type="hidden" name="req_id" value="{{ r._id }}">
+            <input type="hidden" name="action" value="approve">
+            <button class="btn btn-sm btn-success">Approve</button>
+          </form>
+          <form method="post" class="d-inline">
+            <input type="hidden" name="req_id" value="{{ r._id }}">
+            <input type="hidden" name="action" value="reject">
+            <button class="btn btn-sm btn-danger">Reject</button>
+          </form>
+          {% else %}
+          <span class="text-muted">No actions</span>
+          {% endif %}
+        </td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</div>
+{% else %}
+<p class="text-muted">No leave or weekoff requests yet.</p>
+{% endif %}
+{% endblock %}
+

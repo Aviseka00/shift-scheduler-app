@@ -1,20 +1,27 @@
 {
-  "name": "Shift Planner",
-  "short_name": "Shifts",
+  "name": "Shift & Task Scheduler",
+  "short_name": "Shift Planner",
+  "description": "Manage your team shifts and schedules",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
+  "orientation": "portrait-primary",
   "background_color": "#0a0a0f",
   "theme_color": "#b44cff",
   "icons": [
     {
       "src": "/static/icons/icon-192.png",
       "sizes": "192x192",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     },
     {
       "src": "/static/icons/icon-512.png",
       "sizes": "512x512",
-      "type": "image/png"
+      "type": "image/png",
+      "purpose": "any maskable"
     }
-  ]
+  ],
+  "categories": ["productivity", "business"],
+  "screenshots": []
 }

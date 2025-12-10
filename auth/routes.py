@@ -1,5 +1,6 @@
-from datetime import datetime
+from datetime import datetime, timedelta
 import os
+import secrets
 from werkzeug.utils import secure_filename
 
 from flask import Blueprint, render_template, request, redirect, url_for, session, flash, current_app, jsonify
@@ -105,6 +106,144 @@ def logout():
     session.clear()
     flash("Logged out successfully.", "info")
     return redirect(url_for("auth.login"))
+
+
+@auth_bp.route("/forgot-password", methods=["GET", "POST"])
+def forgot_password():
+    """Forgot password - requires privilege key for managers"""
+    if request.method == "POST":
+        email = request.form.get("email").lower()
+        role = request.form.get("role")
+        manager_key = request.form.get("manager_key", "")
+        
+        # Find user
+        user = mongo.db.users.find_one({"email": email})
+        if not user:
+            # Don't reveal if email exists for security
+            flash("If the email exists, a password reset link has been sent.", "info")
+            return redirect(url_for("auth.login"))
+        
+        # Verify role matches
+        if user.get("role") != role:
+            flash("Invalid email or role combination.", "danger")
+            return redirect(url_for("auth.forgot_password"))
+        
+        # Manager privilege key check
+        if role == "manager":
+            SECRET_MANAGER_KEY = "ADMIN2025"
+            if manager_key != SECRET_MANAGER_KEY:
+                flash("Invalid Manager Privilege Key! Managers must provide the correct key to reset password.", "danger")
+                return redirect(url_for("auth.forgot_password"))
+        
+        # Generate reset token
+        reset_token = secrets.token_urlsafe(32)
+        expires_at = datetime.utcnow() + timedelta(hours=1)  # Token valid for 1 hour
+        
+        # Store reset token
+        mongo.db.password_reset_tokens.insert_one({
+            "user_id": user["_id"],
+            "email": email,
+            "token": reset_token,
+            "expires_at": expires_at,
+            "created_at": datetime.utcnow(),
+            "used": False
+        })
+        
+        # Generate reset URL
+        reset_url = url_for("auth.reset_password", token=reset_token, _external=True)
+        
+        # Try to send email
+        try:
+            from utils.email_utils import send_email
+            
+            subject = "Password Reset Request - Shift Scheduler"
+            email_body = f"""
+Hello {user.get('name', 'User')},
+
+You have requested to reset your password for your Shift Scheduler account.
+
+Click the link below to reset your password:
+{reset_url}
+
+This link will expire in 1 hour.
+
+If you did not request this password reset, please ignore this email. Your password will remain unchanged.
+
+Best regards,
+Shift Scheduler Team
+"""
+            
+            email_sent = send_email(email, subject, email_body)
+            
+            if email_sent:
+                flash("Password reset link has been sent to your email address. Please check your inbox.", "success")
+                return redirect(url_for("auth.login"))
+            else:
+                # Email sending failed, show link as fallback
+                flash("Email could not be sent. Please use this reset link:", "warning")
+                flash(f"{reset_url}", "info")
+                flash("Note: Configure email settings in Render.com environment variables to enable email sending.", "info")
+                return redirect(url_for("auth.reset_password", token=reset_token))
+                
+        except Exception as e:
+            # Email utility not available or error occurred
+            current_app.logger.error(f"Email sending error: {str(e)}")
+            flash("Email could not be sent. Please use this reset link:", "warning")
+            flash(f"{reset_url}", "info")
+            flash("Note: Configure email settings in Render.com environment variables to enable email sending.", "info")
+            return redirect(url_for("auth.reset_password", token=reset_token))
+    
+    return render_template("auth/forgot_password.html")
+
+
+@auth_bp.route("/reset-password/<token>", methods=["GET", "POST"])
+def reset_password(token):
+    """Reset password using token"""
+    # Find valid token
+    reset_record = mongo.db.password_reset_tokens.find_one({
+        "token": token,
+        "used": False,
+        "expires_at": {"$gt": datetime.utcnow()}
+    })
+    
+    if not reset_record:
+        flash("Invalid or expired reset token. Please request a new password reset.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+    
+    user = mongo.db.users.find_one({"_id": reset_record["user_id"]})
+    if not user:
+        flash("User not found.", "danger")
+        return redirect(url_for("auth.forgot_password"))
+    
+    if request.method == "POST":
+        new_password = request.form.get("new_password")
+        confirm_password = request.form.get("confirm_password")
+        
+        if new_password != confirm_password:
+            flash("Passwords do not match.", "danger")
+            return redirect(url_for("auth.reset_password", token=token))
+        
+        if len(new_password) < 6:
+            flash("Password must be at least 6 characters long.", "danger")
+            return redirect(url_for("auth.reset_password", token=token))
+        
+        # Update password
+        password_hash = generate_password_hash(new_password)
+        mongo.db.users.update_one(
+            {"_id": user["_id"]},
+            {"$set": {"password_hash": password_hash}}
+        )
+        
+        # Mark token as used
+        mongo.db.password_reset_tokens.update_one(
+            {"_id": reset_record["_id"]},
+            {"$set": {"used": True, "used_at": datetime.utcnow()}}
+        )
+        
+        flash("Password reset successfully! Please login with your new password.", "success")
+        return redirect(url_for("auth.login"))
+    
+    return render_template("auth/reset_password.html", token=token, email=user.get("email", ""))
 
 
 @auth_bp.route("/upload-profile-picture", methods=["POST"])

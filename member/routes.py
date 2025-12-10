@@ -63,6 +63,8 @@ SHIFT_COLORS = {
     "B": "#198754",
     "C": "#ffc107",
     "G": "#6f42c1",
+    "W": "#6c757d",  # Gray (Weekoff)
+    "L": "#dc3545",  # Red (Leave)
 }
 
 
@@ -236,19 +238,21 @@ def api_my_shifts():
 
         project_name = projects_map.get(str(s.get("project_id")), "General")
         task = s.get("task", "")
-
-        tooltip = f"You • {project_name} • {shift_code}"
+        
+        shift_label = "Weekoff" if shift_code == "W" else ("Leave" if shift_code == "L" else shift_code)
+        tooltip = f"You • {project_name} • {shift_label}"
         if task:
             tooltip += f" • {task}"
 
         events.append({
             "id": str(s["_id"]),
-            "title": f"{project_name}: Me – {shift_code}",
+            "title": f"{project_name}: Me – {shift_label}",
             "start": start,
             "end": end,
             "backgroundColor": SHIFT_COLORS.get(shift_code, "#0dcaf0"),
             "borderColor": "#ff0000",
             "borderWidth": 3,
+            "allDay": shift_code in ["W", "L"],  # All day for weekoff/leave
             "extendedProps": {
                 "user_id": str(user_id),
                 "project": project_name,
@@ -319,19 +323,21 @@ def api_all_team_shifts():
         project_name = projects_map.get(str(s.get("project_id")), "General")
 
         is_my_shift = (uid == str(current_user_id))
-
-        tooltip = f"{uname} • {project_name} • {shift_code}"
+        
+        shift_label = "Weekoff" if shift_code == "W" else ("Leave" if shift_code == "L" else shift_code)
+        tooltip = f"{uname} • {project_name} • {shift_label}"
         if task:
             tooltip += f" • {task}"
 
         events.append({
             "id": str(s["_id"]),
-            "title": f"{project_name}: {uname} – {shift_code}",
+            "title": f"{project_name}: {uname} – {shift_label}",
             "start": start,
             "end": end,
             "backgroundColor": SHIFT_COLORS.get(shift_code, "#0dcaf0"),
             "borderColor": "#ff0000" if is_my_shift else SHIFT_COLORS.get(shift_code, "#0dcaf0"),
             "borderWidth": 3 if is_my_shift else 1,
+            "allDay": shift_code in ["W", "L"],  # All day for weekoff/leave
             "extendedProps": {
                 "user_id": uid,
                 "user": uname,
@@ -402,19 +408,21 @@ def api_all_members_planned_shifts():
         project_name = projects_map.get(str(s.get("project_id")), "General")
 
         is_my_shift = (user_id == current_user_id)
-
-        tooltip = f"{user_name} • {project_name} • {shift_code}"
+        
+        shift_label = "Weekoff" if shift_code == "W" else ("Leave" if shift_code == "L" else shift_code)
+        tooltip = f"{user_name} • {project_name} • {shift_label}"
         if task:
             tooltip += f" • {task}"
 
         events.append({
             "id": str(s["_id"]),
-            "title": f"{project_name}: {user_name} – {shift_code}",
+            "title": f"{project_name}: {user_name} – {shift_label}",
             "start": start,
             "end": end,
             "backgroundColor": SHIFT_COLORS.get(shift_code, "#0dcaf0"),
             "borderColor": "#ff0000" if is_my_shift else SHIFT_COLORS.get(shift_code, "#0dcaf0"),
             "borderWidth": 3 if is_my_shift else 1,
+            "allDay": shift_code in ["W", "L"],  # All day for weekoff/leave
             "extendedProps": {
                 "user_id": user_id,
                 "user": user_name,
@@ -624,6 +632,114 @@ def request_swap():
 
     return render_template("member/request_swap.html",
                            users=users,
+                           today_date=date.today().isoformat())
+
+
+# --------------------------------------------------
+# REQUEST WEEKOFF
+# --------------------------------------------------
+@member_bp.route("/request-weekoff", methods=["GET", "POST"])
+@member_required
+def request_weekoff():
+    user_id = ObjectId(session["user_id"])
+
+    if request.method == "POST":
+        date_str = request.form.get("date")
+        reason = request.form.get("reason", "")
+        
+        if not date_str:
+            flash("Please select a date.", "danger")
+            return redirect("/member/request-weekoff")
+        
+        # Check if already has a shift on this date
+        existing_shift = mongo.db.shifts.find_one({
+            "date": date_str,
+            "user_id": user_id
+        })
+        
+        if existing_shift:
+            flash(f"You already have a shift assigned on {date_str}. Please contact manager.", "warning")
+            return redirect("/member/request-weekoff")
+        
+        # Check if already has a pending request for this date
+        existing_request = mongo.db.leave_requests.find_one({
+            "user_id": user_id,
+            "date": date_str,
+            "type": "weekoff",
+            "status": "pending"
+        })
+        
+        if existing_request:
+            flash("You already have a pending weekoff request for this date.", "warning")
+            return redirect("/member/request-weekoff")
+        
+        mongo.db.leave_requests.insert_one({
+            "user_id": user_id,
+            "date": date_str,
+            "type": "weekoff",
+            "reason": reason,
+            "status": "pending",
+            "created_at": datetime.utcnow(),
+        })
+        
+        flash("Weekoff request submitted successfully.", "success")
+        return redirect("/member/dashboard")
+
+    return render_template("member/request_weekoff.html",
+                           today_date=date.today().isoformat())
+
+
+# --------------------------------------------------
+# REQUEST LEAVE
+# --------------------------------------------------
+@member_bp.route("/request-leave", methods=["GET", "POST"])
+@member_required
+def request_leave():
+    user_id = ObjectId(session["user_id"])
+
+    if request.method == "POST":
+        date_str = request.form.get("date")
+        reason = request.form.get("reason", "")
+        
+        if not date_str:
+            flash("Please select a date.", "danger")
+            return redirect("/member/request-leave")
+        
+        # Check if already has a shift on this date
+        existing_shift = mongo.db.shifts.find_one({
+            "date": date_str,
+            "user_id": user_id
+        })
+        
+        if existing_shift:
+            flash(f"You already have a shift assigned on {date_str}. Please contact manager.", "warning")
+            return redirect("/member/request-leave")
+        
+        # Check if already has a pending request for this date
+        existing_request = mongo.db.leave_requests.find_one({
+            "user_id": user_id,
+            "date": date_str,
+            "type": "leave",
+            "status": "pending"
+        })
+        
+        if existing_request:
+            flash("You already have a pending leave request for this date.", "warning")
+            return redirect("/member/request-leave")
+        
+        mongo.db.leave_requests.insert_one({
+            "user_id": user_id,
+            "date": date_str,
+            "type": "leave",
+            "reason": reason,
+            "status": "pending",
+            "created_at": datetime.utcnow(),
+        })
+        
+        flash("Leave request submitted successfully.", "success")
+        return redirect("/member/dashboard")
+
+    return render_template("member/request_leave.html",
                            today_date=date.today().isoformat())
 
 

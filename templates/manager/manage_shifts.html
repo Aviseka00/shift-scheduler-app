@@ -78,6 +78,8 @@
             <option value="B">B (14:00 – 22:30)</option>
             <option value="C">C (22:00 – 06:00 next day)</option>
             <option value="G">G (09:00 – 17:30)</option>
+            <option value="W">W (Weekoff - All Day)</option>
+            <option value="L">L (Leave - All Day)</option>
           </select>
         </div>
         
@@ -97,8 +99,8 @@
         <div class="d-flex justify-content-between align-items-center mb-2">
           <label class="form-label fw-bold mb-0">Select Members *</label>
           <div>
-            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllMembers()">
-              <i class="fas fa-check-square me-1"></i> Select All
+            <button type="button" class="btn btn-sm btn-outline-primary" onclick="selectAllVisibleMembers()">
+              <i class="fas fa-check-square me-1"></i> Select All Visible
             </button>
             <button type="button" class="btn btn-sm btn-outline-secondary" onclick="deselectAllMembers()">
               <i class="fas fa-square me-1"></i> Deselect All
@@ -106,21 +108,56 @@
           </div>
         </div>
         
+        <!-- Search Filter -->
+        <div class="mb-3">
+          <div class="input-group">
+            <span class="input-group-text">
+              <i class="fas fa-search"></i>
+            </span>
+            <input type="text" 
+                   id="memberSearchInput" 
+                   class="form-control" 
+                   placeholder="Search members by name, email, or project..." 
+                   autocomplete="off"
+                   onkeyup="filterMembers()">
+            <button type="button" class="btn btn-outline-secondary" onclick="clearMemberSearch()" title="Clear search">
+              <i class="fas fa-times"></i>
+            </button>
+          </div>
+          <small class="text-muted">
+            <span id="visibleCount">0</span> member(s) visible
+          </small>
+        </div>
+        
         <div class="table-responsive" style="max-height: 300px; overflow-y: auto;">
           <table class="table table-sm table-hover mb-0">
             <thead class="table-light sticky-top">
               <tr>
                 <th style="width: 50px;">
-                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleAllMembers(this)">
+                  <input type="checkbox" id="selectAllCheckbox" onchange="toggleAllVisibleMembers(this)">
                 </th>
                 <th>Member Name</th>
                 <th>Email</th>
                 <th>Projects</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="memberTableBody">
               {% for u in users %}
-              <tr>
+              {% set project_names = [] %}
+              {% if u.project_ids %}
+                {% for pid in u.project_ids %}
+                  {% for p in projects %}
+                    {% if p._id == pid %}
+                      {% set _ = project_names.append(p.name) %}
+                    {% endif %}
+                  {% endfor %}
+                {% endfor %}
+              {% endif %}
+              {% set project_names_str = project_names|join(', ') or 'No projects' %}
+              <tr class="member-row" 
+                  data-name="{{ u.name|lower }}" 
+                  data-email="{{ u.email|lower }}" 
+                  data-projects="{{ project_names_str|lower }}">
                 <td>
                   <input type="checkbox" name="selected_members" value="{{ u._id }}" class="member-checkbox">
                 </td>
@@ -128,16 +165,8 @@
                 <td><small class="text-muted">{{ u.email }}</small></td>
                 <td>
                   <small>
-                    {% if u.project_ids %}
-                      {% set project_names = [] %}
-                      {% for pid in u.project_ids %}
-                        {% for p in projects %}
-                          {% if p._id == pid %}
-                            {% set _ = project_names.append(p.name) %}
-                          {% endif %}
-                        {% endfor %}
-                      {% endfor %}
-                      {{ project_names|join(', ') or 'None' }}
+                    {% if project_names %}
+                      {{ project_names|join(', ') }}
                     {% else %}
                       <span class="text-muted">No projects</span>
                     {% endif %}
@@ -147,6 +176,9 @@
               {% endfor %}
             </tbody>
           </table>
+        </div>
+        <div id="noResultsMessage" class="alert alert-info d-none" role="alert">
+          <i class="fas fa-info-circle me-2"></i>No members found matching your search.
         </div>
         <small class="text-muted">
           <span id="selectedCount">0</span> member(s) selected
@@ -204,6 +236,8 @@
             <option value="B">B (14:00 – 22:30)</option>
             <option value="C">C (22:00 – 06:00 next day)</option>
             <option value="G">G (09:00 – 17:30)</option>
+            <option value="W">W (Weekoff - All Day)</option>
+            <option value="L">L (Leave - All Day)</option>
           </select>
         </div>
 
@@ -325,6 +359,30 @@
 {% endblock %}
 
 {% block scripts %}
+<style>
+/* Search input enhancements */
+#memberSearchInput {
+  transition: all 0.3s ease;
+}
+
+#memberSearchInput:focus {
+  border-color: #667eea;
+  box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+}
+
+.member-row {
+  transition: opacity 0.2s ease;
+}
+
+.member-row[style*="display: none"] {
+  opacity: 0;
+}
+
+/* Highlight matching text (optional enhancement) */
+.member-row strong {
+  transition: color 0.2s ease;
+}
+</style>
 <script>
 // Update selected count
 function updateSelectedCount() {
@@ -342,12 +400,57 @@ function updateSelectedCount() {
   }
 }
 
-// Select all members
-function selectAllMembers() {
-  document.querySelectorAll('.member-checkbox').forEach(cb => {
+// Filter members based on search input
+function filterMembers() {
+  const searchInput = document.getElementById('memberSearchInput');
+  const searchTerm = searchInput.value.toLowerCase().trim();
+  const rows = document.querySelectorAll('.member-row');
+  const noResultsMessage = document.getElementById('noResultsMessage');
+  let visibleCount = 0;
+  
+  rows.forEach(row => {
+    const name = row.getAttribute('data-name') || '';
+    const email = row.getAttribute('data-email') || '';
+    const projects = row.getAttribute('data-projects') || '';
+    
+    if (searchTerm === '' || 
+        name.includes(searchTerm) || 
+        email.includes(searchTerm) || 
+        projects.includes(searchTerm)) {
+      row.style.display = '';
+      visibleCount++;
+    } else {
+      row.style.display = 'none';
+    }
+  });
+  
+  // Update visible count
+  document.getElementById('visibleCount').textContent = visibleCount;
+  
+  // Show/hide no results message
+  if (visibleCount === 0 && searchTerm !== '') {
+    noResultsMessage.classList.remove('d-none');
+  } else {
+    noResultsMessage.classList.add('d-none');
+  }
+  
+  // Update select all checkbox state based on visible rows
+  updateSelectAllCheckboxState();
+}
+
+// Clear member search
+function clearMemberSearch() {
+  document.getElementById('memberSearchInput').value = '';
+  filterMembers();
+  document.getElementById('memberSearchInput').focus();
+}
+
+// Select all visible members
+function selectAllVisibleMembers() {
+  document.querySelectorAll('.member-row:not([style*="display: none"]) .member-checkbox').forEach(cb => {
     cb.checked = true;
   });
-  document.getElementById('selectAllCheckbox').checked = true;
+  updateSelectAllCheckboxState();
   updateSelectedCount();
 }
 
@@ -360,12 +463,33 @@ function deselectAllMembers() {
   updateSelectedCount();
 }
 
-// Toggle all members from header checkbox
-function toggleAllMembers(checkbox) {
-  document.querySelectorAll('.member-checkbox').forEach(cb => {
+// Toggle all visible members from header checkbox
+function toggleAllVisibleMembers(checkbox) {
+  document.querySelectorAll('.member-row:not([style*="display: none"]) .member-checkbox').forEach(cb => {
     cb.checked = checkbox.checked;
   });
   updateSelectedCount();
+}
+
+// Update select all checkbox state based on visible checked members
+function updateSelectAllCheckboxState() {
+  const visibleCheckboxes = document.querySelectorAll('.member-row:not([style*="display: none"]) .member-checkbox');
+  const visibleChecked = document.querySelectorAll('.member-row:not([style*="display: none"]) .member-checkbox:checked');
+  const selectAllCheckbox = document.getElementById('selectAllCheckbox');
+  
+  if (visibleCheckboxes.length === 0) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  } else if (visibleChecked.length === visibleCheckboxes.length) {
+    selectAllCheckbox.checked = true;
+    selectAllCheckbox.indeterminate = false;
+  } else if (visibleChecked.length > 0) {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = true;
+  } else {
+    selectAllCheckbox.checked = false;
+    selectAllCheckbox.indeterminate = false;
+  }
 }
 
 // Individual checkbox change
@@ -374,11 +498,22 @@ document.addEventListener('DOMContentLoaded', function() {
   document.querySelectorAll('.member-checkbox').forEach(cb => {
     cb.addEventListener('change', function() {
       updateSelectedCount();
-      // Update select all checkbox state
-      const allChecked = document.querySelectorAll('.member-checkbox:checked').length === document.querySelectorAll('.member-checkbox').length;
-      document.getElementById('selectAllCheckbox').checked = allChecked;
+      updateSelectAllCheckboxState();
     });
   });
+  
+  // Add search input event listener for real-time filtering
+  const searchInput = document.getElementById('memberSearchInput');
+  if (searchInput) {
+    searchInput.addEventListener('input', filterMembers);
+    // Allow Enter key to focus on search
+    searchInput.addEventListener('keydown', function(e) {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        filterMembers();
+      }
+    });
+  }
   
   // Form validation
   document.getElementById('bulkShiftForm').addEventListener('submit', function(e) {
@@ -398,6 +533,8 @@ document.addEventListener('DOMContentLoaded', function() {
   
   // Initial count update
   updateSelectedCount();
+  filterMembers(); // Initialize visible count
 });
 </script>
 {% endblock %}
+

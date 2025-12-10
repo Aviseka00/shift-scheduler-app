@@ -9,6 +9,8 @@ SHIFT_COLORS = {
     "B": "#198754",  # Green
     "C": "#ffc107",  # Yellow/Amber
     "G": "#6f42c1",  # Purple
+    "W": "#6c757d",  # Gray (Weekoff)
+    "L": "#dc3545",  # Red (Leave)
 }
 
 SHIFT_TIMES = {
@@ -16,9 +18,11 @@ SHIFT_TIMES = {
     "B": {"start": "17:00", "end": "01:00"},
     "C": {"start": "21:00", "end": "05:00"},
     "G": {"start": "06:00", "end": "14:00"},
+    "W": {"start": "00:00", "end": "23:59"},  # Weekoff - all day
+    "L": {"start": "00:00", "end": "23:59"},  # Leave - all day
 }
 
-VALID_SHIFT_CODES = ["A", "B", "C", "G"]
+VALID_SHIFT_CODES = ["A", "B", "C", "G", "W", "L"]
 
 # User roles
 ROLES = {
@@ -39,6 +43,12 @@ NOTIFICATION_TYPES = {
     "SHIFT_APPROVED": "shift_approved",
     "SHIFT_REJECTED": "shift_rejected",
     "SHIFT_ASSIGNED": "shift_assigned",
+    "LEAVE_REQUEST": "leave_request",
+    "WEEKOFF_REQUEST": "weekoff_request",
+    "LEAVE_APPROVED": "leave_approved",
+    "LEAVE_REJECTED": "leave_rejected",
+    "WEEKOFF_APPROVED": "weekoff_approved",
+    "WEEKOFF_REJECTED": "weekoff_rejected",
 }
 
 # Request statuses
