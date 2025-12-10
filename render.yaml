@@ -11,4 +11,17 @@ services:
         sync: false
       - key: PYTHON_VERSION
         value: 3.11.0
+      # Email configuration (optional - set these in Render dashboard)
+      - key: MAIL_SERVER
+        sync: false
+      - key: MAIL_PORT
+        value: "587"
+      - key: MAIL_USE_TLS
+        value: "true"
+      - key: MAIL_USERNAME
+        sync: false
+      - key: MAIL_PASSWORD
+        sync: false
+      - key: MAIL_DEFAULT_SENDER
+        sync: false
 
